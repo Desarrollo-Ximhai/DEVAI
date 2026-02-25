@@ -129,40 +129,53 @@ def recuperar_memoria_proyecto(client, embed_fn, user_query, collection_memory, 
 
 
 def build_prompt_from_chunks(chunks, user_query, memory=None):
-    context = "\n\n---\n\n".join([chunk.payload["text"] for chunk in chunks])
+    context = "\n\n---\n\n".join([
+        chunk.payload["text"] for chunk in chunks
+        if chunk.payload and "text" in chunk.payload
+    ])
 
     memoria = ""
     if memory and len(memory) > 0:
         memoria = "\n\n".join([
-            f"[{i+1}] {chunk.payload['text']}" for i, chunk in enumerate(memory)
+            f"[{i+1}] {chunk.payload['text']}"
+            for i, chunk in enumerate(memory)
+            if chunk.payload and "text" in chunk.payload
         ])
 
+    memoria_block = ""
+    if memoria:
+        memoria_block = (
+            "MEMORIA DE LA CONVERSACIÓN ANTERIOR:\n"
+            + memoria +
+            "\n\n---\n"
+        )
+
     prompt = f"""
-      Eres un asistente de desarrollo extremadamente preciso y especializado en interpretar código PHP, HTML y SQL dentro de un framework personalizado.
+Eres un asistente de desarrollo extremadamente preciso y especializado en interpretar código PHP, HTML y SQL dentro de un framework personalizado.
 
-      A continuación tienes fragmentos REALES de código fuente del framework. No inventes ni completes nada que no esté explícitamente en el texto. No menciones de dónde salió el fragmento. No hagas suposiciones. Si no hay suficiente información para responder con certeza, responde claramente que no es posible responder.
+A continuación tienes fragmentos REALES de código fuente del framework. No inventes ni completes nada que no esté explícitamente en el texto. No menciones de dónde salió el fragmento. No hagas suposiciones. Si no hay suficiente información para responder con certeza, responde claramente que no es posible responder.
 
-      INSTRUCCIONES:
-      - Usa solo lo que se encuentra en el contexto y en la memoria.
-      - Responde de forma concreta y profesional.
-      - No repitas el prompt ni resumas el contexto.
-      - En caso de las vistas no inventes inputs ni etiquetas HTML, utiliza siempre la clase Ximhai o los ejemplos de código para extraer datos.
-      - No generes estructuras incompletas.
-      - No menciones el nombre de los archivos ni rutas.
+INSTRUCCIONES:
+- Usa solo lo que se encuentra en el contexto y en la memoria.
+- Responde de forma concreta y profesional.
+- No repitas el prompt ni resumas el contexto.
+- En caso de las vistas no inventes inputs ni etiquetas HTML, utiliza siempre la clase Ximhai o los ejemplos de código para extraer datos.
+- No generes estructuras incompletas.
+- No menciones el nombre de los archivos ni rutas.
 
-      {f"MEMORIA DE LA CONVERSACIÓN ANTERIOR:\n{memoria}\n\n---\n" if memoria else ""}
-      CONTEXTO DEL CÓDIGO:
-      {context}
+{memoria_block}
+CONTEXTO DEL CÓDIGO:
+{context}
 
-      ---
+---
 
-      PREGUNTA:
-      {user_query}
+PREGUNTA:
+{user_query}
 
-      ---
+---
 
-      RESPUESTA:
-      """
+RESPUESTA:
+"""
     return prompt.strip()
 
 

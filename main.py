@@ -235,7 +235,7 @@ def query_rag(user_query: str, proyecto: str = "default"):
             client=client,
             embed_fn=embed_with_gemini,
             user_query=user_query,
-            collection_memory,
+            collection_memory=collection_memory,
             proyecto=proyecto,
             limit=8
         )
@@ -265,3 +265,4 @@ def query_rag(user_query: str, proyecto: str = "default"):
 
     except Exception as e:
         return {'error': str(e)}, 500
+

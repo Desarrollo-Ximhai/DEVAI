@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import nest_asyncio
 import google.generativeai as genai
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Filter, FieldCondition, MatchValue, PointStruct
@@ -265,4 +266,5 @@ def query_rag(user_query: str, proyecto: str = "default"):
 
     except Exception as e:
         return {'error': str(e)}, 500
+
 

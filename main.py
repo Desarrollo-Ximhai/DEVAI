@@ -42,7 +42,7 @@ def embed_with_gemini(text, dimension=3072):
     """Devuelve un embedding del texto usando Gemini."""
     # genai.embed_content usará la clave globalmente configurada (GOOGLE_API_KEY)
     res = genai.embed_content(
-        model='gemini-embedding-001',
+        model='models/gemini-embedding-001',
         content=text,
         task_type="retrieval_document",
         output_dimensionality=dimension
@@ -176,7 +176,7 @@ RESPUESTA:
 
 
 #def generate_response(prompt, model_name="gemini-2.5-flash"):
-def generate_response(prompt, model_name="gemini-3-flash-preview"):
+def generate_response(prompt, model_name="models/gemini-3-flash-preview"):
 
     chat_model = genai.GenerativeModel(model_name)
     convo = chat_model.start_chat()
@@ -259,6 +259,7 @@ def query_rag(user_query: str, proyecto: str = "default"):
 
     except Exception as e:
         return {'error': str(e)}, 500
+
 
 
 

@@ -219,13 +219,13 @@ def query_rag(user_query: str, proyecto: str = "default"):
         
         # Step 3: build prompt
         prompt = build_prompt_from_chunks(chunks, user_query, memory)
-        print("despues de hacer prompt")
+		print("despues de hacer prompt")
         # Configure Gemini for response generation (using KEY_FREE2)
         genai.configure(api_key=KEY_FREE2)
 
         # Step 4: generate response
         response_text = generate_response(prompt)
-        print("acabando")
+		print("acabando")
         # Configure Gemini back for embedding (using GOOGLE_API_KEY)
         genai.configure(api_key=GOOGLE_API_KEY)
 
@@ -257,6 +257,7 @@ def devai_endpoint(request: QueryRequest):
 	print('respuesta')
 	print(respuesta)
 	return {"response": respuesta}
+
 
 
 

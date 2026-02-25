@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import os
-import nest_asyncio
 import google.generativeai as genai
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Filter, FieldCondition, MatchValue, PointStruct
@@ -9,7 +8,6 @@ import uuid
 from datetime import datetime
 from fastapi import FastAPI
 from pydantic import BaseModel
-import nest_asyncio
 import uvicorn
 
 QDRANT_URL = os.environ["QDRANT_URL"]
@@ -193,7 +191,6 @@ def generate_response(prompt, model_name="gemini-3-flash-preview"):
 
 
 
-nest_asyncio.apply()
 
 app = FastAPI()
 
@@ -266,5 +263,6 @@ def query_rag(user_query: str, proyecto: str = "default"):
 
     except Exception as e:
         return {'error': str(e)}, 500
+
 
 

@@ -63,7 +63,7 @@ def search_in_qdrant(client, collection_name, query_embedding, k=top_k):
 
 
 
-def guardar_memoria_en_qdrant(client, embed_fn, user_query, respuesta, proyecto="default"):
+def guardar_memoria_en_qdrant(client, embed_fn, user_query, collection_memory, respuesta, proyecto="default"):
     """
     Guarda en Qdrant un turno de conversación (usuario + asistente) como memoria semántica.
     embed_fn: función que recibe texto y regresa embedding (por ejemplo, embed_with_gemini)
@@ -237,6 +237,7 @@ def query_rag(user_query: str, proyecto: str = "default"):
             client=client,
             embed_fn=embed_with_gemini,
             user_query=user_query,
+			collection_memory=collection_memory,
             respuesta=response_text,
             proyecto=proyecto
         )
@@ -258,3 +259,4 @@ def devai_endpoint(request: QueryRequest):
 		proyecto=request.proyecto
 	)
 	return {"response": respuesta}
+

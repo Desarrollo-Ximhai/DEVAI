@@ -253,7 +253,10 @@ def devai_endpoint(request: QueryRequest):
 		user_query=request.query,
 		proyecto=request.proyecto
 	)
+	print('respuesta')
+	print(respuesta)
 	return {"response": respuesta}
+
 
 
 

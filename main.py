@@ -201,14 +201,14 @@ def query_rag(user_query: str, proyecto: str = "default"):
             return {'error': 'Failed to generate embedding for query'}, 500
 
         print("Despues de hacer embedding")
-        print(query_embedding)
+        
         collection_name = "DEVAI-embeddings"
 
         collection_memory = "DevAI-Memory-CAPUFE"
         # Step 2: retrieval from Qdrant
         chunks = search_in_qdrant(client, collection_name, query_embedding, k=10)
         print("Despues de hacer buscar en qdrant")
-        print(chunks)
+        
         # Step 2.5: retrieval of memory
         memory = recuperar_memoria_proyecto(
             client=client,
@@ -219,16 +219,16 @@ def query_rag(user_query: str, proyecto: str = "default"):
             limit=8
         )
         print("Despues de hacer buscar en memoria")
-        print(memory)
+        
         # Step 3: build prompt
         prompt = build_prompt_from_chunks(chunks, user_query, memory)
-        print(prompt)
+        
         # Configure Gemini for response generation (using KEY_FREE2)
         genai.configure(api_key=KEY_FREE2)
 
         # Step 4: generate response
         response_text = generate_response(prompt)
-        print(response_text)
+        
         # Configure Gemini back for embedding (using GOOGLE_API_KEY)
         genai.configure(api_key=GOOGLE_API_KEY)
 
@@ -259,4 +259,5 @@ def devai_endpoint(request: QueryRequest):
 		proyecto=request.proyecto
 	)
 	return {"response": respuesta}
+
 

@@ -190,7 +190,7 @@ def query_rag(user_query: str, proyecto: str = "default"):
        
         #basedatos = data.get('basedatos', 'default')
         #codigo = data.get('codigo', false)
-		print("Iniciando")
+        print("Iniciando")
         if not user_query:
             return {'error': 'Missing user_query in request body'}, 400
 
@@ -198,7 +198,7 @@ def query_rag(user_query: str, proyecto: str = "default"):
         query_embedding = embed_with_gemini(user_query)
         if query_embedding is None:
             return {'error': 'Failed to generate embedding for query'}, 500
-		print("despues de hacer embedding")
+        print("despues de hacer embedding")
 
         
         collection_name = "DEVAI-embeddings"
@@ -219,13 +219,13 @@ def query_rag(user_query: str, proyecto: str = "default"):
         
         # Step 3: build prompt
         prompt = build_prompt_from_chunks(chunks, user_query, memory)
-		print("despues de hacer prompt")
+        print("despues de hacer prompt")
         # Configure Gemini for response generation (using KEY_FREE2)
         genai.configure(api_key=KEY_FREE2)
 
         # Step 4: generate response
         response_text = generate_response(prompt)
-		print("acabando")
+        print("acabando")
         # Configure Gemini back for embedding (using GOOGLE_API_KEY)
         genai.configure(api_key=GOOGLE_API_KEY)
 
@@ -257,6 +257,7 @@ def devai_endpoint(request: QueryRequest):
 	print('respuesta')
 	print(respuesta)
 	return {"response": respuesta}
+
 
 
 

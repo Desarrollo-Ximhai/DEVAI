@@ -49,7 +49,7 @@ def embed_with_gemini(text, dimension=3072):
     )
     return res["embedding"] if "embedding" in res else None
 
-def search_in_qdrant(client, collction_name, query_embedding, k=top_k):
+def search_in_qdrant(client, collection_name, query_embedding, k=top_k):
     """Busca los k chunks más relevantes en Qdrant para el embedding dado."""
     results = client.query_points(
         collection_name=collection_name,
@@ -259,6 +259,7 @@ def query_rag(user_query: str, proyecto: str = "default"):
 
     except Exception as e:
         return {'error': str(e)}, 500
+
 
 
 

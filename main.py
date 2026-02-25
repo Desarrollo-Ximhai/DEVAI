@@ -16,10 +16,6 @@ KEY_FREE = os.environ.get("KEY_FREE")
 KEY_FREE2 = os.environ.get("GOOGLE_API_KEY2") 
 GOOGLE_API_KEY= os.environ.get('KEY-FREE') 
 
-# Get both API keys from Colab secrets
-GOOGLE_API_KEY= userdata.get('KEY-FREE') # Asumiendo que esta es para embeddings
-KEY_FREE2= userdata.get('GOOGLE_API_KEY2') # Asumiendo que esta es para embeddings
-KEY_FREE= userdata.get('KEY-FREE') # Asumiendo que esta es para el LLM
 
 # Configure Gemini globally with GOOGLE_API_KEY for embedding operations
 genai.configure(api_key=GOOGLE_API_KEY)
@@ -263,6 +259,7 @@ def query_rag(user_query: str, proyecto: str = "default"):
 
     except Exception as e:
         return {'error': str(e)}, 500
+
 
 
 

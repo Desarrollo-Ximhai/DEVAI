@@ -101,7 +101,6 @@ def guardar_memoria_en_qdrant(client, embed_fn, user_query, collection_memory, r
         points=points,
         wait=True
     )
-    print(f"✅ Memoria guardada ({len(points)} puntos) para proyecto '{proyecto}'.")
 
 
 def recuperar_memoria_proyecto(client, embed_fn, user_query, collection_memory, proyecto="default", limit=5):
@@ -200,14 +199,12 @@ def query_rag(user_query: str, proyecto: str = "default"):
         if query_embedding is None:
             return {'error': 'Failed to generate embedding for query'}, 500
 
-        print("Despues de hacer embedding")
         
         collection_name = "DEVAI-embeddings"
 
         collection_memory = "DevAI-Memory-CAPUFE"
         # Step 2: retrieval from Qdrant
         chunks = search_in_qdrant(client, collection_name, query_embedding, k=10)
-        print("Despues de hacer buscar en qdrant")
         
         # Step 2.5: retrieval of memory
         memory = recuperar_memoria_proyecto(
@@ -218,7 +215,6 @@ def query_rag(user_query: str, proyecto: str = "default"):
             proyecto=proyecto,
             limit=8
         )
-        print("Despues de hacer buscar en memoria")
         
         # Step 3: build prompt
         prompt = build_prompt_from_chunks(chunks, user_query, memory)
@@ -241,7 +237,6 @@ def query_rag(user_query: str, proyecto: str = "default"):
             respuesta=response_text,
             proyecto=proyecto
         )
-        print('acabo')
         return {'response': response_text}, 200
 
     except Exception as e:
@@ -259,5 +254,6 @@ def devai_endpoint(request: QueryRequest):
 		proyecto=request.proyecto
 	)
 	return {"response": respuesta}
+
 
 

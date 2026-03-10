@@ -263,7 +263,7 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
 
         if not user_query:
             return {'error': 'No se recibió un prompt válido'}, 400
-		if not chat_id:
+        if not chat_id:
             return {'error': 'No se recibió un id de chat válido'}, 400
 
 
@@ -350,11 +350,11 @@ class QueryRequest(BaseModel):
 def devai_endpoint(request: QueryRequest):
 	respuesta = query_rag(
 		user_query=request.query,
-		memoria=request.memoria
-		chat_id=request.chat_id
-		codigo=request.codigo
-		basedatos=request.basedatos
-		analisis=request.analisis
+		memoria=request.memoria,
+		chat_id=request.chat_id,
+		codigo=request.codigo,
+		basedatos=request.basedatos,
+		analisis=request.analisis,
 		proyecto=request.proyecto
 	)
 	print('respuesta')

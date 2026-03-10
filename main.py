@@ -51,6 +51,8 @@ def embed_with_gemini(text, dimension=3072):
 
 def search_in_qdrant(client, collection_name, query_embedding, k=top_k):
     """Busca los k chunks más relevantes en Qdrant para el embedding dado."""
+    print("Buscando en ")
+    print(collection_name)
     results = client.query_points(
         collection_name=collection_name,
         query=query_embedding,
@@ -63,7 +65,7 @@ def search_in_qdrant(client, collection_name, query_embedding, k=top_k):
 
 
 
-def guardar_memoria_en_qdrant(client, embed_fn, user_query, collection_memory, respuesta, proyecto="default"):
+def guardar_memoria_en_qdrant(client, embed_fn, user_query, collection_memory, respuesta, chat_id, proyecto="default"):
     """
     Guarda en Qdrant un turno de conversación (usuario + asistente) como memoria semántica.
     embed_fn: función que recibe texto y regresa embedding (por ejemplo, embed_with_gemini)
@@ -85,6 +87,7 @@ def guardar_memoria_en_qdrant(client, embed_fn, user_query, collection_memory, r
                 vector=emb,
                 payload={
                     "text": item["text"],
+                    "chat_id": chat_id,
                     "role": item["role"],
                     "project": proyecto,
                     "timestamp": datetime.utcnow().isoformat()
@@ -101,30 +104,64 @@ def guardar_memoria_en_qdrant(client, embed_fn, user_query, collection_memory, r
         points=points,
         wait=True
     )
+    print(f"✅ Memoria guardada ({len(points)} puntos) para proyecto '{proyecto}'.")
 
 
-def recuperar_memoria_proyecto(client, embed_fn, user_query, collection_memory, proyecto="default", limit=5):
+def recuperar_memoria_proyecto(client, embed_fn, user_query, collection_memory, chat_id, proyecto="default", limit=5):
     """
     Recupera memoria relevante para un proyecto dado, usando query_points.
     Regresa una lista de puntos (ScoredPoint-like) que luego pasas a build_prompt_from_chunks como `memory`.
     """
-    query_emb = embed_fn(user_query,768)
+    filtros = [
+        FieldCondition(
+            key="role",
+            match=MatchValue(value="assistant")
+        ),
+        
+    ]
+    if proyecto:
+        filtros.append(
+            FieldCondition(
+                key="project",
+                match=MatchValue(value=proyecto)
+            )
+        )
 
+    if chat_id:
+        filtros.append(
+            FieldCondition(
+                key="chat_id",
+                match=MatchValue(value=chat_id)
+            )
+        )
+    query_emb = embed_fn(user_query,768)
     res = client.query_points(
         collection_name=collection_memory,
         query=query_emb,
         limit=limit,
         with_payload=True,
-        with_vectors=False
+        with_vectors=False,
+        query_filter=Filter(
+            must=filtros
+        )
     )
 
-    # res.points es lo que tú ya usas
     return res.points
 
 
-def build_prompt_from_chunks(chunks, user_query, memory=None):
-    context = "\n\n---\n\n".join([
-        chunk.payload["text"] for chunk in chunks
+def build_prompt_from_chunks(chunksCodigo, chunksBD, chunksArchivo, user_query, memory=None):
+    contextCodigo = "\n\n---\n\n".join([
+        chunk.payload["text"] for chunk in chunksCodigo
+        if chunk.payload and "text" in chunk.payload
+    ])
+
+    contextBD = "\n\n---\n\n".join([
+        chunk.payload["text"] for chunk in chunksBD
+        if chunk.payload and "text" in chunk.payload
+    ])
+
+    contextoArchivo = "\n\n---\n\n".join([
+        chunk.payload["text"] for chunk in chunksArchivo
         if chunk.payload and "text" in chunk.payload
     ])
 
@@ -144,6 +181,31 @@ def build_prompt_from_chunks(chunks, user_query, memory=None):
             "\n\n---\n"
         )
 
+    codigo_block = ""
+    if contextCodigo:
+        codigo_block = (
+            "CONTEXTO DE CÓDIGO :\n"
+            + contextCodigo +
+            "\n\n---\n"
+        )
+    bd_block = ""
+    if contextBD:
+        bd_block = (
+            "CONTEXTO DE BASE DE DATOS :\n"
+            + contextBD +
+            "\n\n---\n"
+        )
+
+    archivo_block = ""
+    if contextoArchivo:
+        codigo_archivo = (
+            "CONTEXTO DE ANÁLISIS:\n"
+            + contextoArchivo +
+            "\n\n---\n"
+        )
+
+
+    #print(memoria)
     prompt = f"""
 Eres un asistente de desarrollo extremadamente preciso y especializado en interpretar código PHP, HTML y SQL dentro de un framework personalizado.
 
@@ -158,10 +220,18 @@ INSTRUCCIONES:
 - No menciones el nombre de los archivos ni rutas.
 
 {memoria_block}
-CONTEXTO DEL CÓDIGO:
-{context}
+---
+
+{codigo_block}
 
 ---
+{bd_block}
+
+---
+{archivo_block}
+
+---
+
 
 PREGUNTA:
 {user_query}
@@ -185,73 +255,106 @@ def generate_response(prompt, model_name="models/gemini-3-flash-preview"):
 
 
 
-def query_rag(user_query: str, proyecto: str = "default"):
+def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyecto: str = "default"  ):
     try:
-       
+
         #basedatos = data.get('basedatos', 'default')
         #codigo = data.get('codigo', false)
-        print("Iniciando")
+
         if not user_query:
-            return {'error': 'Missing user_query in request body'}, 400
+            return {'error': 'No se recibió un prompt válido'}, 400
+		if not chat_id:
+            return {'error': 'No se recibió un id de chat válido'}, 400
+
 
         # Step 1: embedding the user query
         query_embedding = embed_with_gemini(user_query)
         if query_embedding is None:
             return {'error': 'Failed to generate embedding for query'}, 500
-        print("despues de hacer embedding")
 
-        
-        collection_name = "DEVAI-embeddings"
+        query_embedding768 = embed_with_gemini(user_query,768)
+        if query_embedding is None:
+            return {'error': 'Failed to generate embedding for query'}, 500
 
-        collection_memory = "DevAI-Memory-CAPUFE"
+
+        print("Despues de hacer embedding")
+
+        #DEVAI-embeddings
+
+        #DevAI-Memory
+        collection_memory = memoria
         # Step 2: retrieval from Qdrant
-        chunks = search_in_qdrant(client, collection_name, query_embedding, k=10)
-        
+
+        chunksCodigo = search_in_qdrant(client, codigo, query_embedding, k=10)
+        print("en codigo");
+        chunksBD = search_in_qdrant(client, bd, query_embedding768, k=10)
+        print("en bd");
+        chunksArchivo = search_in_qdrant(client, archivo, query_embedding768, k=10)
+        print("en archivo");
+
+        print("Despues de hacer buscar en qdrant")
+
         # Step 2.5: retrieval of memory
         memory = recuperar_memoria_proyecto(
             client=client,
             embed_fn=embed_with_gemini,
             user_query=user_query,
             collection_memory=collection_memory,
+            chat_id=chat_id,
             proyecto=proyecto,
             limit=8
         )
         
+        print("Despues de hacer buscar en memoria")
         # Step 3: build prompt
-        prompt = build_prompt_from_chunks(chunks, user_query, memory)
-        print("despues de hacer prompt")
+        prompt = build_prompt_from_chunks(chunksCodigo, chunksBD, chunksArchivo, user_query, memory)
+        #print(prompt)
         # Configure Gemini for response generation (using KEY_FREE2)
         genai.configure(api_key=KEY_FREE2)
 
         # Step 4: generate response
         response_text = generate_response(prompt)
-        print("acabando")
+        print(response_text)
         # Configure Gemini back for embedding (using GOOGLE_API_KEY)
         genai.configure(api_key=GOOGLE_API_KEY)
 
         # Step 5: save conversation memory
+
         guardar_memoria_en_qdrant(
             client=client,
             embed_fn=embed_with_gemini,
             user_query=user_query,
-			collection_memory=collection_memory,
+            collection_memory=collection_memory,
             respuesta=response_text,
+            chat_id=chat_id,
             proyecto=proyecto
         )
+        print('acabo')
         return {'response': response_text}, 200
 
     except Exception as e:
         return {'error': str(e)}, 500
+	
 
 app = FastAPI()
 class QueryRequest(BaseModel):
 	query: str
+	memoria:str ="DevAI-Memory"
+	chat_id:int
+	codigo:str = "DEVAI-embeddings"
+	basedatos:str = "DevAI-DB"
+	analisis:str = "DevAI-Analisis"
 	proyecto: str = "default"
 
 @app.post("/devai")
 def devai_endpoint(request: QueryRequest):
 	respuesta = query_rag(
 		user_query=request.query,
+		memoria=request.memoria
+		chat_id=request.chat_id
+		codigo=request.codigo
+		basedatos=request.basedatos
+		analisis=request.analisis
 		proyecto=request.proyecto
 	)
 	print('respuesta')

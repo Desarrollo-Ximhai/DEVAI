@@ -142,7 +142,7 @@ def recuperar_memoria_proyecto(client, embed_fn, user_query, collection_memory, 
         with_payload=True,
         with_vectors=False,
         query_filter=Filter(
-            must=filtros
+            should=filtros
         )
     )
 
@@ -360,6 +360,7 @@ def devai_endpoint(request: QueryRequest):
 	print('respuesta')
 	print(respuesta)
 	return {"response": respuesta}
+
 
 
 

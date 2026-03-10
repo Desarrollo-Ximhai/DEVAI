@@ -342,8 +342,8 @@ class QueryRequest(BaseModel):
 	memoria:str ="DevAI-Memory"
 	chat_id:int
 	codigo:str = "DEVAI-embeddings"
-	basedatos:str = "DevAI-DB"
-	analisis:str = "DevAI-Analisis"
+	bd:str = "DevAI-DB"
+	archivo:str = "DevAI-Analisis"
 	proyecto: str = "default"
 
 @app.post("/devai")
@@ -353,8 +353,8 @@ def devai_endpoint(request: QueryRequest):
 		memoria=request.memoria,
 		chat_id=request.chat_id,
 		codigo=request.codigo,
-		basedatos=request.basedatos,
-		analisis=request.analisis,
+		bd=request.bd,
+		archivo=request.archivo,
 		proyecto=request.proyecto
 	)
 	print('respuesta')

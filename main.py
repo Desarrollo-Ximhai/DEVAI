@@ -346,6 +346,12 @@ class QueryRequest(BaseModel):
 	archivo:str = "DevAI-Analisis"
 	proyecto: str = "default"
 
+@app.get("/health")
+def health():
+    return {
+        "status": "ok"
+    }
+
 @app.post("/devai")
 def devai_endpoint(request: QueryRequest):
 	respuesta = query_rag(

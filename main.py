@@ -255,7 +255,7 @@ def generate_response(prompt, model_name="models/gemini-3-flash-preview"):
 
 
 
-def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyecto: str = "default", model_name: "models/gemini-3-flash-preview"  ):
+def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyecto: str = "default", model_name= "models/gemini-3-flash-preview"  ):
     t0 = time.time()
 
     try:

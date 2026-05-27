@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+import time
 import os
 import google.generativeai as genai
 from qdrant_client import QdrantClient
@@ -256,6 +256,8 @@ def generate_response(prompt, model_name="models/gemini-3-flash-preview"):
 
 
 def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyecto: str = "default"  ):
+    t0 = time.time()
+
     try:
 
         #basedatos = data.get('basedatos', 'default')
@@ -268,32 +270,35 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
 
 
         # Step 1: embedding the user query
+        
         query_embedding = embed_with_gemini(user_query)
         if query_embedding is None:
             return {'error': 'Failed to generate embedding for query'}, 500
+        print("Embedding:", time.time() - t0)
 
+        t1 = time.time()
         query_embedding768 = embed_with_gemini(user_query,768)
         if query_embedding is None:
             return {'error': 'Failed to generate embedding for query'}, 500
-
-
-        print("Despues de hacer embedding")
+        print("Embedding2:", time.time() - t1)
 
         #DEVAI-embeddings
 
         #DevAI-Memory
         collection_memory = memoria
         # Step 2: retrieval from Qdrant
-
+        t2 = time.time()
         chunksCodigo = search_in_qdrant(client, codigo, query_embedding, k=10)
-        print("en codigo");
+        print("En codigo:", time.time() - t2)
+        t3 = time.time()
         chunksBD = search_in_qdrant(client, bd, query_embedding768, k=10)
-        print("en bd");
+        print("En bd:", time.time() - t3)
+        t4 = time.time()
         chunksArchivo = search_in_qdrant(client, archivo, query_embedding768, k=10)
-        print("en archivo");
+        print("En Archivo:", time.time() - t4)
 
         print("Despues de hacer buscar en qdrant")
-
+        t5 = time.time()
         # Step 2.5: retrieval of memory
         memory = recuperar_memoria_proyecto(
             client=client,
@@ -304,22 +309,21 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
             proyecto=proyecto,
             limit=8
         )
-        
-        print("Despues de hacer buscar en memoria")
+        print("Despues de hacer buscar en memoria:", time.time() - t5)
         # Step 3: build prompt
         prompt = build_prompt_from_chunks(chunksCodigo, chunksBD, chunksArchivo, user_query, memory)
         #print(prompt)
         # Configure Gemini for response generation (using KEY_FREE2)
         genai.configure(api_key=KEY_FREE2)
-
+        t6 = time.time()
         # Step 4: generate response
         response_text = generate_response(prompt)
         print(response_text)
         # Configure Gemini back for embedding (using GOOGLE_API_KEY)
         genai.configure(api_key=GOOGLE_API_KEY)
-
+        print("Despues de respuesta:", time.time() - t6)
         # Step 5: save conversation memory
-
+        t7 = time.time()
         guardar_memoria_en_qdrant(
             client=client,
             embed_fn=embed_with_gemini,
@@ -329,7 +333,7 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
             chat_id=chat_id,
             proyecto=proyecto
         )
-        print('acabo')
+        print("Acaba:", time.time() - t7)
         return {'response': response_text}, 200
 
     except Exception as e:

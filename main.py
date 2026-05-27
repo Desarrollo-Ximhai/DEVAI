@@ -349,6 +349,7 @@ class QueryRequest(BaseModel):
 	bd:str = "DevAI-DB"
 	archivo:str = "DevAI-Analisis"
 	proyecto: str = "default"
+    model_name str = "models/gemini-3-flash-preview"
 
 @app.get("/health")
 def health():
@@ -366,6 +367,7 @@ def devai_endpoint(request: QueryRequest):
 		bd=request.bd,
 		archivo=request.archivo,
 		proyecto=request.proyecto
+        model_name=request.model_name
 	)
 	print('respuesta')
 	print(respuesta)

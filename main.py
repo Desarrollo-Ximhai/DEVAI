@@ -366,7 +366,7 @@ def devai_endpoint(request: QueryRequest):
 		codigo=request.codigo,
 		bd=request.bd,
 		archivo=request.archivo,
-		proyecto=request.proyecto
+		proyecto=request.proyecto,
         model_name=request.model_name
 	)
 	print('respuesta')

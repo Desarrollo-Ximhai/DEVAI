@@ -255,7 +255,7 @@ def generate_response(prompt, model_name="models/gemini-3-flash-preview"):
 
 
 
-def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyecto: str = "default"  ):
+def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyecto: str = "default", model_name: "models/gemini-3-flash-preview"  ):
     t0 = time.time()
 
     try:
@@ -317,7 +317,7 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
         genai.configure(api_key=KEY_FREE2)
         t6 = time.time()
         # Step 4: generate response
-        response_text = generate_response(prompt)
+        response_text = generate_response(prompt, model_name)
         print(response_text)
         # Configure Gemini back for embedding (using GOOGLE_API_KEY)
         genai.configure(api_key=GOOGLE_API_KEY)
@@ -378,7 +378,7 @@ def devai_endpoint(request: QueryRequest):
 
 class FreePromptRequest(BaseModel):
     prompt: str
-    model_name: str = "models/gemini-3-flash-preview"
+    model_name: str = "models/gemini-2.5-flash"
 
 def generate_free_response(prompt_text: str, model_name: str):
     """Genera una respuesta directa de Gemini sin usar contexto de Qdrant."""

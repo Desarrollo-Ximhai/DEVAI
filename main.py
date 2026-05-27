@@ -342,14 +342,14 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
 
 app = FastAPI()
 class QueryRequest(BaseModel):
-	query: str
-	memoria:str ="DevAI-Memory"
-	chat_id:int
-	codigo:str = "DEVAI-embeddings"
-	bd:str = "DevAI-DB"
-	archivo:str = "DevAI-Analisis"
-	proyecto: str = "default"
-    model_name str = "models/gemini-3-flash-preview"
+    query: str
+    memoria:str ="DevAI-Memory"
+    chat_id:int
+    codigo:str = "DEVAI-embeddings"
+    bd:str = "DevAI-DB"
+    archivo:str = "DevAI-Analisis" 
+    proyecto: str = "default"
+    model_name: str = "models/gemini-3-flash-preview"
 
 @app.get("/health")
 def health():

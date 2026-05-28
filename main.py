@@ -10,6 +10,17 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 import uvicorn
 
+#para el borrado de puntos
+from accionesQdrant import borrar_por_chat_id, borrar_por_point_id
+
+#para la autenticacion de la API
+from fastapi import HTTPException, Header
+
+def verificar_clave(x_api_key: str = Header(...)):
+    if x_api_key != ADMIN_KEY:
+        raise HTTPException(status_code=403, detail="No autorizado: Clave inválida")
+
+
 QDRANT_URL = os.environ["QDRANT_URL"]
 QDRANT_API_KEY = os.environ.get("QDRANT_API_KEY") 
 KEY_FREE = os.environ.get("KEY_FREE") 
@@ -366,7 +377,7 @@ def health():
         "status": "ok"
     }
 
-@app.post("/devai")
+@app.post("/devai", dependencies=[Depends(verificar_clave)])
 def devai_endpoint(request: QueryRequest):
 	respuesta = query_rag(
 		user_query=request.query,
@@ -398,7 +409,7 @@ def generate_free_response(prompt_text: str, model_name: str):
     
     return response.text
 
-@app.post("/prompt")
+@app.post("/prompt", dependencies=[Depends(verificar_clave)])
 def free_prompt_endpoint(request: FreePromptRequest):
     """
     Endpoint para enviar cualquier prompt directo a Gemini.
@@ -418,7 +429,33 @@ def free_prompt_endpoint(request: FreePromptRequest):
         return {"error": str(e)}, 500
 
 
+# =================================================================
+# NUEVO APARTADO: Acciones de QDRANT para borrar puntos 
+# =================================================================
+class BorrarChatRequest(BaseModel):
+    collection_name: str
+    chat_id: int
 
+class BorrarPuntoRequest(BaseModel):
+    collection_name: str
+    point_id: str
 
+@app.post("/borrar_chat", dependencies=[Depends(verificar_clave)])
+def endpoint_borrar_chat(request: BorrarChatRequest):
+    """Endpoint para borrar todo el historial de un chat por ID."""
+    try:
+        res = borrar_por_chat_id(client, request.collection_name, request.chat_id)
+        return {"status": "success", "result": res.status}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.post("/borrar_punto", dependencies=[Depends(verificar_clave)])
+def endpoint_borrar_punto(request: BorrarPuntoRequest):
+    """Endpoint para borrar un único punto por su ID."""
+    try:
+        res = borrar_por_point_id(client, request.collection_name, request.point_id)
+        return {"status": "success", "result": res.status}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 

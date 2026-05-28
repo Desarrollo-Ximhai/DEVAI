@@ -76,14 +76,16 @@ def guardar_memoria_en_qdrant(client, embed_fn, user_query, collection_memory, r
     ]
 
     points = []
+    uuids = []
     for item in textos:
         emb = embed_fn(item["text"],768)
         if emb is None:
             continue
-
+        unUUUID = uuid.uuid4()
+        uuids.append(unUUUID)
         points.append(
             PointStruct(
-                id=str(uuid.uuid4()),
+                id=str(unUUUID),
                 vector=emb,
                 payload={
                     "text": item["text"],
@@ -105,6 +107,7 @@ def guardar_memoria_en_qdrant(client, embed_fn, user_query, collection_memory, r
         wait=True
     )
     print(f"✅ Memoria guardada ({len(points)} puntos) para proyecto '{proyecto}'.")
+    return uuids
 
 
 def recuperar_memoria_proyecto(client, embed_fn, user_query, collection_memory, chat_id, proyecto="default", limit=5):
@@ -324,7 +327,7 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
         print("Despues de respuesta:", time.time() - t6)
         # Step 5: save conversation memory
         t7 = time.time()
-        guardar_memoria_en_qdrant(
+        uuids = guardar_memoria_en_qdrant(
             client=client,
             embed_fn=embed_with_gemini,
             user_query=user_query,
@@ -334,7 +337,7 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
             proyecto=proyecto
         )
         print("Acaba:", time.time() - t7)
-        return {'response': response_text}, 200
+        return {'response': response_text, 'uuids' : uuids}, 200
 
     except Exception as e:
         return {'error': str(e)}, 500

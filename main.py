@@ -18,7 +18,7 @@ from fastapi import Depends
 from fastapi import HTTPException, Header
 
 #Para el tokenizador
-from typing import List, Optional
+from typing import Any, Optional
 import tiktoken
 
 ADMIN_KEY = os.environ.get("ADMIN_API_KEY")
@@ -61,39 +61,56 @@ class ChatTurn(BaseModel):
     assistant: str
 
 
-def optimizar_y_aplanar_historial(historial: List[ChatTurn], max_tokens: int):
+def optimizar_y_aplanar_historial(historial: Any, max_tokens: int):
     """
-    Recibe el historial de parejas, cuenta tokens del presente al pasado,
-    y devuelve una lista plana formateada para la API del LLM.
+    Parsea, limpia y aplana el historial sin importar si viene como 
+    String JSON o como lista de diccionarios desde PHP.
     """
+    # Si viene como un String de texto debido a un json_encode en PHP, lo convertimos a lista
+    if isinstance(historial, str):
+        try:
+            historial = json.loads(historial)
+        except Exception:
+            return [], 0  # Si el JSON está mal formado, devolvemos historial vacío
+            
+    # Si después de intentar parsearlo no es una lista, abortamos pacíficamente
+    if not isinstance(historial, list):
+        return [], 0
+
     encoding = tiktoken.get_encoding("cl100k_base")
-    
     historial_plano_final = []
     tokens_acumulados = 0
     
     # Iteramos los turnos de atrás hacia adelante (del más nuevo al más viejo)
     for turno in reversed(historial):
         
-        # Calculamos los tokens de este bloque completo (Pregunta + Respuesta con código PHP)
-        tokens_user = len(encoding.encode(turno.user)) + 4
-        tokens_assistant = len(encoding.encode(turno.assistant)) + 4
+        # Nos aseguramos de que el elemento sea un diccionario/objeto válido
+        if isinstance(turno, dict):
+            u_text = turno.get("user", "")
+            a_text = turno.get("assistant", "")
+        else:
+            # Si hay basura dentro de la lista, la saltamos
+            continue
+            
+        # Calculamos tokens
+        tokens_user = len(encoding.encode(str(u_text))) + 4
+        tokens_assistant = len(encoding.encode(str(a_text))) + 4
         tokens_turno = tokens_user + tokens_assistant
         
-        # Si este turno completo supera el límite de tokens, dejamos de añadir mensajes viejos
+        # Si supera el límite de tokens pasados desde PHP, cortamos el pasado
         if tokens_acumulados + tokens_turno > max_tokens:
             break
             
-        # Transformamos la pareja al formato plano que sí entiende Gemini/ChatGPT
+        # Estructuramos al formato plano clásico que le gusta a Gemini/OpenAI
         componentes_turno = [
-            {"role": "user", "content": turno.user},
-            {"role": "assistant", "content": turno.assistant}
+            {"role": "user", "content": u_text},
+            {"role": "assistant", "content": a_text}
         ]
         
-        # Los inyectamos al PRINCIPIO de nuestra lista final. 
-        # Esto hace que, aunque contemos al revés, el resultado final se ordene cronológicamente bien.
+        # Los inyectamos al principio para mantener el orden cronológico
         historial_plano_final = componentes_turno + historial_plano_final
         tokens_acumulados += tokens_turno
-    print("tokens usados:" + tokens_acumulados)
+        
     return historial_plano_final
 
 

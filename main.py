@@ -167,7 +167,8 @@ def recuperar_memoria_proyecto(client, embed_fn, user_query, collection_memory, 
     puntos.sort(
         key=lambda x: x.payload.get("timestamp", 0)
     )
-
+    print("puntos que trajo la BD")
+    print(puntos)
     return puntos
 
 
@@ -198,7 +199,7 @@ def build_prompt_from_chunks(chunksCodigo, chunksBD, chunksArchivo, user_query, 
     memoria_block = ""
     if memoria:
         memoria_block = (
-            "MEMORIA DE LA CONVERSACIÓN ANTERIOR:\n"
+            "[1] MEMORIA DE LA CONVERSACIÓN ANTERIOR:\n"
             + memoria +
             "\n\n---\n"
         )
@@ -206,14 +207,14 @@ def build_prompt_from_chunks(chunksCodigo, chunksBD, chunksArchivo, user_query, 
     codigo_block = ""
     if contextCodigo:
         codigo_block = (
-            "CONTEXTO DE CÓDIGO :\n"
+            "[2] CONTEXTO DE CÓDIGO :\n"
             + contextCodigo +
             "\n\n---\n"
         )
     bd_block = ""
     if contextBD:
         bd_block = (
-            "CONTEXTO DE BASE DE DATOS :\n"
+            "[3] CONTEXTO DE BASE DE DATOS :\n"
             + contextBD +
             "\n\n---\n"
         )
@@ -221,7 +222,7 @@ def build_prompt_from_chunks(chunksCodigo, chunksBD, chunksArchivo, user_query, 
     archivo_block = ""
     if contextoArchivo:
         codigo_archivo = (
-            "CONTEXTO DE ANÁLISIS:\n"
+            "[4] CONTEXTO DE ANÁLISIS:\n"
             + contextoArchivo +
             "\n\n---\n"
         )

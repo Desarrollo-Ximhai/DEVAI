@@ -380,7 +380,7 @@ class QueryRequest(BaseModel):
     archivo:str = "DevAI-Analisis" 
     proyecto: str = "default"
     model_name: str = "models/gemini-3-flash-preview"
-    historiarl: str = ""
+    historial: str = ""
 
 @app.get("/health")
 def health():

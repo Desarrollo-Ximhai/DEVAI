@@ -14,6 +14,7 @@ import uvicorn
 from accionesQdrant import borrar_por_chat_id, borrar_por_point_id
 
 #para la autenticacion de la API
+from fastapi import Depends
 from fastapi import HTTPException, Header
 
 ADMIN_KEY = os.environ.get("ADMIN_API_KEY")

@@ -172,7 +172,7 @@ def recuperar_memoria_proyecto(client, embed_fn, user_query, collection_memory, 
     return puntos
 
 
-def build_prompt_from_chunks(chunksCodigo, chunksBD, chunksArchivo, user_query, memory=None):
+def build_prompt_from_chunks(chunksCodigo, chunksBD, chunksArchivo, user_query, memory=None, historial = ''):
     contextCodigo = "\n\n---\n\n".join([
         chunk.payload["text"] for chunk in chunksCodigo
         if chunk.payload and "text" in chunk.payload
@@ -199,7 +199,7 @@ def build_prompt_from_chunks(chunksCodigo, chunksBD, chunksArchivo, user_query, 
     memoria_block = ""
     if memoria:
         memoria_block = (
-            "[1] MEMORIA DE LA CONVERSACIÓN ANTERIOR:\n"
+            "[MEMORIA] MEMORIA DE CHATS RELACIONADOS A LA PREGUNTA:\n"
             + memoria +
             "\n\n---\n"
         )
@@ -207,14 +207,14 @@ def build_prompt_from_chunks(chunksCodigo, chunksBD, chunksArchivo, user_query, 
     codigo_block = ""
     if contextCodigo:
         codigo_block = (
-            "[2] CONTEXTO DE CÓDIGO :\n"
+            "[CODIGO] CONTEXTO DE CÓDIGO :\n"
             + contextCodigo +
             "\n\n---\n"
         )
     bd_block = ""
     if contextBD:
         bd_block = (
-            "[3] CONTEXTO DE BASE DE DATOS :\n"
+            "[BD] CONTEXTO DE BASE DE DATOS :\n"
             + contextBD +
             "\n\n---\n"
         )
@@ -222,7 +222,7 @@ def build_prompt_from_chunks(chunksCodigo, chunksBD, chunksArchivo, user_query, 
     archivo_block = ""
     if contextoArchivo:
         codigo_archivo = (
-            "[4] CONTEXTO DE ANÁLISIS:\n"
+            "[ANALISIS] CONTEXTO DE ANÁLISIS:\n"
             + contextoArchivo +
             "\n\n---\n"
         )
@@ -232,15 +232,15 @@ def build_prompt_from_chunks(chunksCodigo, chunksBD, chunksArchivo, user_query, 
     prompt = f"""
 Eres un asistente de desarrollo extremadamente preciso y especializado en interpretar código PHP, HTML y SQL dentro de un framework personalizado.
 
-A continuación tienes fragmentos REALES de código fuente del framework. No inventes ni completes nada que no esté explícitamente en el texto. No menciones de dónde salió el fragmento. No hagas suposiciones. Si no hay suficiente información para responder con certeza, responde claramente que no es posible responder.
+A continuación tienes fragmentos REALES de código fuente del framework ([CODIGO]). No inventes ni completes nada que no esté explícitamente en el texto. No menciones de dónde salió el fragmento. No hagas suposiciones. Si no hay suficiente información para responder con certeza, responde claramente que no es posible responder y da la razón.
 
 INSTRUCCIONES:
-- Usa solo lo que se encuentra en el contexto y en la memoria.
+- Usa solo lo que se encuentra en el contexto ([CODIGO], [BD], [ANALISIS]) y en la memoria([MEMORIA], [HISTORIAL]).
 - Responde de forma concreta y profesional.
 - No repitas el prompt ni resumas el contexto.
-- En caso de las vistas no inventes inputs ni etiquetas HTML, utiliza siempre la clase Ximhai o los ejemplos de código para extraer datos.
+- En caso de las vistas no inventes inputs ni etiquetas HTML, utiliza siempre la clase Ximhai o los ejemplos de código([CODIGO]) para extraer datos.
 - No generes estructuras incompletas.
-- No menciones el nombre de los archivos ni rutas.
+- El codigo debe ir encasillado dentro de (```)
 
 {memoria_block}
 ---
@@ -252,6 +252,12 @@ INSTRUCCIONES:
 
 ---
 {archivo_block}
+
+---
+
+---
+[HISTORIAL] HISTORIAL DE CONVERSACIÓN:
+{historial}
 
 ---
 
@@ -278,7 +284,7 @@ def generate_response(prompt, model_name="models/gemini-3-flash-preview"):
 
 
 
-def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyecto: str = "default", model_name= "models/gemini-3-flash-preview"  ):
+def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyecto: str = "default", model_name= "models/gemini-3-flash-preview", historial = ''  ):
     t0 = time.time()
 
     try:
@@ -334,8 +340,9 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
         )
         print("Despues de hacer buscar en memoria:", time.time() - t5)
         # Step 3: build prompt
-        prompt = build_prompt_from_chunks(chunksCodigo, chunksBD, chunksArchivo, user_query, memory)
-        #print(prompt)
+        prompt = build_prompt_from_chunks(chunksCodigo, chunksBD, chunksArchivo, user_query, memory, historial)
+        print('prompt:')
+        print(prompt)
         # Configure Gemini for response generation (using KEY_FREE2)
         genai.configure(api_key=KEY_FREE2)
         t6 = time.time()
@@ -373,6 +380,7 @@ class QueryRequest(BaseModel):
     archivo:str = "DevAI-Analisis" 
     proyecto: str = "default"
     model_name: str = "models/gemini-3-flash-preview"
+    historiarl: str = ""
 
 @app.get("/health")
 def health():
@@ -390,10 +398,11 @@ def devai_endpoint(request: QueryRequest):
 		bd=request.bd,
 		archivo=request.archivo,
 		proyecto=request.proyecto,
-        model_name=request.model_name
+        model_name=request.model_name,
+        historial=request.historial
 	)
-	print('respuesta')
-	print(respuesta)
+	#print('respuesta')
+	#print(respuesta)
 	return {"response": respuesta}
 
 

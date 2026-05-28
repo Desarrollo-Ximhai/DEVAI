@@ -145,11 +145,17 @@ def recuperar_memoria_proyecto(client, embed_fn, user_query, collection_memory, 
         with_payload=True,
         with_vectors=False,
         query_filter=Filter(
-            should=filtros
+            must=filtros
         )
     )
+    puntos = res.points
 
-    return res.points
+    # ordenar cronológicamente
+    puntos.sort(
+        key=lambda x: x.payload.get("timestamp", 0)
+    )
+
+    return puntos
 
 
 def build_prompt_from_chunks(chunksCodigo, chunksBD, chunksArchivo, user_query, memory=None):

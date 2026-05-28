@@ -380,18 +380,12 @@ def devai_endpoint(request: QueryRequest):
 
 class FreePromptRequest(BaseModel):
     prompt: str
-    model_name: str = "models/gemini-2.5-flash"
+    model_name: str 
 
 def generate_free_response(prompt_text: str, model_name: str):
-    """Genera una respuesta directa de Gemini sin usar contexto de Qdrant."""
-    # Usamos la llave KEY_FREE2 para la generación, manteniendo la lógica de tu código
     genai.configure(api_key=KEY_FREE2)
-    
     chat_model = genai.GenerativeModel(model_name)
     response = chat_model.generate_content(prompt_text)
-    
-    # Regresamos la configuración a la llave original por seguridad para tus otros endpoints
-    genai.configure(api_key=GOOGLE_API_KEY)
     
     return response.text
 
@@ -403,6 +397,8 @@ def free_prompt_endpoint(request: FreePromptRequest):
     try:
         if not request.prompt:
             return {"error": "No se recibió un prompt válido"}, 400
+        if not request.model_name:
+            return {"error": "No se recibió un modelo válido"}, 400
         
         print(f"Recibiendo prompt libre: {request.prompt}")
         respuesta_texto = generate_free_response(request.prompt, request.model_name)

@@ -16,8 +16,9 @@ from accionesQdrant import borrar_por_chat_id, borrar_por_point_id
 #para la autenticacion de la API
 from fastapi import HTTPException, Header
 
-def verificar_clave(x_api_key: str = Header(...)):
-    if x_api_key != ADMIN_KEY:
+ADMIN_KEY = os.environ.get("ADMIN_API_KEY")
+def verificar_clave(api_key: str = Header(...)):
+    if api_key != ADMIN_KEY:
         raise HTTPException(status_code=403, detail="No autorizado: Clave inválida")
 
 

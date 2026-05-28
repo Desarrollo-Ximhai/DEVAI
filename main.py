@@ -17,6 +17,10 @@ from accionesQdrant import borrar_por_chat_id, borrar_por_point_id
 from fastapi import Depends
 from fastapi import HTTPException, Header
 
+#Para el tokenizador
+from typing import List, Optional
+import tiktoken
+
 ADMIN_KEY = os.environ.get("ADMIN_API_KEY")
 def verificar_clave(api_key: str = Header(...)):
     if api_key != ADMIN_KEY:
@@ -50,6 +54,49 @@ client = QdrantClient(
 
 
 top_k = 5
+
+
+class ChatTurn(BaseModel):
+    user: str
+    assistant: str
+
+
+def optimizar_y_aplanar_historial(historial: List[ChatTurn], max_tokens: int):
+    """
+    Recibe el historial de parejas, cuenta tokens del presente al pasado,
+    y devuelve una lista plana formateada para la API del LLM.
+    """
+    encoding = tiktoken.get_encoding("cl100k_base")
+    
+    historial_plano_final = []
+    tokens_acumulados = 0
+    
+    # Iteramos los turnos de atrás hacia adelante (del más nuevo al más viejo)
+    for turno in reversed(historial):
+        
+        # Calculamos los tokens de este bloque completo (Pregunta + Respuesta con código PHP)
+        tokens_user = len(encoding.encode(turno.user)) + 4
+        tokens_assistant = len(encoding.encode(turno.assistant)) + 4
+        tokens_turno = tokens_user + tokens_assistant
+        
+        # Si este turno completo supera el límite de tokens, dejamos de añadir mensajes viejos
+        if tokens_acumulados + tokens_turno > max_tokens:
+            break
+            
+        # Transformamos la pareja al formato plano que sí entiende Gemini/ChatGPT
+        componentes_turno = [
+            {"role": "user", "content": turno.user},
+            {"role": "assistant", "content": turno.assistant}
+        ]
+        
+        # Los inyectamos al PRINCIPIO de nuestra lista final. 
+        # Esto hace que, aunque contemos al revés, el resultado final se ordene cronológicamente bien.
+        historial_plano_final = componentes_turno + historial_plano_final
+        tokens_acumulados += tokens_turno
+    print("tokens usados:" + tokens_acumulados)
+    return historial_plano_final
+
+
 
 def embed_with_gemini(text, dimension=3072):
     """Devuelve un embedding del texto usando Gemini."""
@@ -284,7 +331,7 @@ def generate_response(prompt, model_name="models/gemini-3-flash-preview"):
 
 
 
-def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyecto: str = "default", model_name= "models/gemini-3-flash-preview", historial = ''  ):
+def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyecto: str = "default", model_name= "models/gemini-3-flash-preview", historial = '', max_tokens = 6000  ):
     t0 = time.time()
 
     try:
@@ -340,7 +387,10 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
         )
         print("Despues de hacer buscar en memoria:", time.time() - t5)
         # Step 3: build prompt
-        prompt = build_prompt_from_chunks(chunksCodigo, chunksBD, chunksArchivo, user_query, memory, historial)
+
+        historialModificado = optimizar_y_aplanar_historial(historial, max_tokens)
+
+        prompt = build_prompt_from_chunks(chunksCodigo, chunksBD, chunksArchivo, user_query, memory, historialModificado)
         print('prompt:')
         print(prompt)
         # Configure Gemini for response generation (using KEY_FREE2)
@@ -381,6 +431,7 @@ class QueryRequest(BaseModel):
     proyecto: str = "default"
     model_name: str = "models/gemini-3-flash-preview"
     historial: str = ""
+    max_tokens: int = 6000
 
 @app.get("/health")
 def health():
@@ -399,7 +450,8 @@ def devai_endpoint(request: QueryRequest):
 		archivo=request.archivo,
 		proyecto=request.proyecto,
         model_name=request.model_name,
-        historial=request.historial
+        historial=request.historial,
+        max_tokens=request.max_tokens
 	)
 	#print('respuesta')
 	#print(respuesta)

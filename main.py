@@ -354,7 +354,8 @@ def generate_response(prompt, model_name="models/gemini-3-flash-preview", archiv
     convo = chat_model.start_chat()
     #response = convo.send_message(prompt)
     response = convo.send_message(contenidos_payload)
-    tokens = chat_model.count_tokens((contenidos_payload + response.text))
+    payload_total_tokens = contenidos_payload + [response.text]
+    tokens = chat_model.count_tokens(payload_total_tokens)
     return response.text
 
 

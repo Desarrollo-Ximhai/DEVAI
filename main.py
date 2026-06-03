@@ -420,14 +420,17 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
         historialModificado = optimizar_y_aplanar_historial(historial, max_tokens)
 
         prompt = build_prompt_from_chunks(chunksCodigo, chunksBD, chunksArchivo, user_query, memory, historialModificado)
-        print('prompt:')
-        print(prompt)
+        #print('prompt:')
+        #print(prompt)
         # Configure Gemini for response generation (using KEY_FREE2)
         genai.configure(api_key=KEY_FREE2)
         t6 = time.time()
         # Step 4: generate response
+        print('archivos')
+        print(archivos)
+
         response_text = generate_response(prompt, model_name, archivos)
-        print(response_text)
+        #print(response_text)
         # Configure Gemini back for embedding (using GOOGLE_API_KEY)
         genai.configure(api_key=GOOGLE_API_KEY)
         print("Despues de respuesta:", time.time() - t6)
@@ -491,8 +494,12 @@ async def devai_endpoint(request: Request):
     archivos_procesados = []
     for key, value in form_data.items():
         if key.startswith("files[") and isinstance(value, UploadFile):
+            print(f"📁 [DEBUG ARCHIVO] Entró al filtro: {key}")
             # Leemos los bytes de forma asíncrona
             contenido_bytes = await value.read()
+            print(f"   | Filename: {getattr(value, 'filename', 'No tiene')}")
+            print(f"   | Content-Type: {getattr(value, 'content_type', 'No tiene')}")
+            print(f"   | Tamaño real leído: {len(contenido_bytes)} bytes")
             archivos_procesados.append({
                 "mime_type": value.content_type,   # Ej: "image/png" o "application/pdf"
                 "data": contenido_bytes           # Los bytes puros del archivo

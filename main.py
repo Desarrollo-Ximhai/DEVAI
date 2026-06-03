@@ -6,9 +6,11 @@ from qdrant_client import QdrantClient
 from qdrant_client.http.models import Filter, FieldCondition, MatchValue, PointStruct
 import uuid
 from datetime import datetime
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, UploadFile
 from pydantic import BaseModel
 import uvicorn
+from typing import Optional
+import json
 
 #para el borrado de puntos
 from accionesQdrant import borrar_por_chat_id, borrar_por_point_id
@@ -300,6 +302,7 @@ A continuación tienes fragmentos REALES de código fuente del framework ([CODIG
 
 INSTRUCCIONES:
 - Usa solo lo que se encuentra en el contexto ([CODIGO], [BD], [ANALISIS]) y en la memoria([MEMORIA], [HISTORIAL]).
+- Si el usuario adjuntó imágenes, diagramas o archivos directamente en la petición actual, analízalos rigurosamente junto con el contexto de código provisto.
 - Responde de forma concreta y profesional.
 - No repitas el prompt ni resumas el contexto.
 - En caso de las vistas no inventes inputs ni etiquetas HTML, utiliza siempre la clase Ximhai o los ejemplos de código([CODIGO]) para extraer datos.
@@ -338,17 +341,25 @@ RESPUESTA:
 
 
 #def generate_response(prompt, model_name="gemini-2.5-flash"):
-def generate_response(prompt, model_name="models/gemini-3-flash-preview"):
+def generate_response(prompt, model_name="models/gemini-3-flash-preview", archivos: list = None):
 
     chat_model = genai.GenerativeModel(model_name)
+    contenidos_payload = [prompt]
+    if archivos:
+        for arc in archivos:
+            contenidos_payload.append({
+                "mime_type": arc["mime_type"],
+                "data": arc["data"]
+            })
     convo = chat_model.start_chat()
-    response = convo.send_message(prompt)
-    tokens = chat_model.count_tokens((prompt + response.text))
+    #response = convo.send_message(prompt)
+    response = convo.send_message(contenidos_payload)
+    tokens = chat_model.count_tokens((contenidos_payload + response.text))
     return response.text
 
 
 
-def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyecto: str = "default", model_name= "models/gemini-3-flash-preview", historial = '', max_tokens = 6000  ):
+def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyecto: str = "default", model_name= "models/gemini-3-flash-preview", historial = '', max_tokens = 6000, archivos_recibidos = None  ):
     t0 = time.time()
 
     try:
@@ -414,7 +425,7 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
         genai.configure(api_key=KEY_FREE2)
         t6 = time.time()
         # Step 4: generate response
-        response_text = generate_response(prompt, model_name)
+        response_text = generate_response(prompt, model_name, archivos_recibidos)
         print(response_text)
         # Configure Gemini back for embedding (using GOOGLE_API_KEY)
         genai.configure(api_key=GOOGLE_API_KEY)
@@ -438,6 +449,8 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
 	
 
 app = FastAPI()
+
+#Esta clase ya no se usa, agarramos los datos directo del request.
 class QueryRequest(BaseModel):
     query: str
     memoria:str ="DevAI-Memory"
@@ -457,8 +470,38 @@ def health():
     }
 
 @app.post("/devai", dependencies=[Depends(verificar_clave)])
-def devai_endpoint(request: QueryRequest):
-	respuesta = query_rag(
+async def devai_endpoint(request: Request):
+    # 1. Extraemos todo el contenido del formulario multipart
+    form_data = request.form()
+    
+    # 2. Extraemos los campos de texto con los mismos valores por defecto que tenías
+    query = form_data.get("query", "")
+    memoria = form_data.get("memoria", "DevAI-Memory")
+    chat_id = int(form_data.get("chat_id", 0))
+    codigo = form_data.get("codigo", "DEVAI-embeddings")
+    bd = form_data.get("basedatos", form_data.get("bd", "DevAI-DB"))
+    archivo = form_data.get("analisis", form_data.get("archivo", "DevAI-Analisis"))
+    proyecto = form_data.get("proyecto", "default")
+    model_name = form_data.get("model_name", "models/gemini-3.1-flash-lite")
+    historial = form_data.get("historial", "")
+    max_tokens = int(form_data.get("max_tokens", 6000))
+
+    # CAMBIO AQUÍ: Procesamos los archivos a un formato compatible con Gemini
+    archivos_procesados = []
+    for key, value in form_data.items():
+        if key.startswith("files[") and isinstance(value, UploadFile):
+            # Leemos los bytes de forma asíncrona
+            contenido_bytes = await value.read()
+            archivos_procesados.append({
+                "mime_type": value.content_type,   # Ej: "image/png" o "application/pdf"
+                "data": contenido_bytes           # Los bytes puros del archivo
+            })
+
+    # En este punto, 'archivos_recibidos' es una lista limpia de objetos UploadFile de FastAPI
+    # [UploadFile(filename="archivo1.pdf", ...), UploadFile(filename="imagen.png", ...)]
+
+
+    respuesta = query_rag(
 		user_query=request.query,
 		memoria=request.memoria,
 		chat_id=request.chat_id,
@@ -468,11 +511,12 @@ def devai_endpoint(request: QueryRequest):
 		proyecto=request.proyecto,
         model_name=request.model_name,
         historial=request.historial,
-        max_tokens=request.max_tokens
-	)
+        max_tokens=request.max_tokens,
+        archivos=archivos_recibidos
+        )
 	#print('respuesta')
 	#print(respuesta)
-	return {"response": respuesta}
+    return {"response": respuesta}
 
 
 # =================================================================

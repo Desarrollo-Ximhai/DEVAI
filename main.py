@@ -493,6 +493,7 @@ async def devai_endpoint(request: Request):
     # CAMBIO AQUÍ: Procesamos los archivos a un formato compatible con Gemini
     archivos_procesados = []
     for key, value in form_data.items():
+        print(f"➡️ Llave recibida: '{key}' | Tipo real en Python: {type(value)}")
         if key.startswith("files[") and isinstance(value, UploadFile):
             print(f"📁 [DEBUG ARCHIVO] Entró al filtro: {key}")
             # Leemos los bytes de forma asíncrona

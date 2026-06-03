@@ -359,7 +359,7 @@ def generate_response(prompt, model_name="models/gemini-3-flash-preview", archiv
 
 
 
-def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyecto: str = "default", model_name= "models/gemini-3-flash-preview", historial = '', max_tokens = 6000, archivos_recibidos = None  ):
+def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyecto: str = "default", model_name= "models/gemini-3-flash-preview", historial = '', max_tokens = 6000, archivos = None  ):
     t0 = time.time()
 
     try:
@@ -425,7 +425,7 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
         genai.configure(api_key=KEY_FREE2)
         t6 = time.time()
         # Step 4: generate response
-        response_text = generate_response(prompt, model_name, archivos_recibidos)
+        response_text = generate_response(prompt, model_name, archivos)
         print(response_text)
         # Configure Gemini back for embedding (using GOOGLE_API_KEY)
         genai.configure(api_key=GOOGLE_API_KEY)
@@ -502,17 +502,17 @@ async def devai_endpoint(request: Request):
 
 
     respuesta = query_rag(
-		user_query=request.query,
-		memoria=request.memoria,
-		chat_id=request.chat_id,
-		codigo=request.codigo,
-		bd=request.bd,
-		archivo=request.archivo,
-		proyecto=request.proyecto,
-        model_name=request.model_name,
-        historial=request.historial,
-        max_tokens=request.max_tokens,
-        archivos=archivos_recibidos
+		user_query=query,
+		memoria=memoria,
+		chat_id=chat_id,
+		codigo=codigo,
+		bd=bd,
+		archivo=archivo,
+		proyecto=proyecto,
+        model_name=model_name,
+        historial=historial,
+        max_tokens=max_tokens,
+        archivos=archivos_procesados
         )
 	#print('respuesta')
 	#print(respuesta)

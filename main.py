@@ -472,7 +472,7 @@ def health():
 @app.post("/devai", dependencies=[Depends(verificar_clave)])
 async def devai_endpoint(request: Request):
     # 1. Extraemos todo el contenido del formulario multipart
-    form_data = request.form()
+    form_data = await request.form()
     
     # 2. Extraemos los campos de texto con los mismos valores por defecto que tenías
     query = form_data.get("query", "")

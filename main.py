@@ -494,7 +494,7 @@ async def devai_endpoint(request: Request):
     archivos_procesados = []
     for key, value in form_data.items():
         print(f"➡️ Llave recibida: '{key}' | Tipo real en Python: {type(value)}")
-        if key.startswith("files[") and isinstance(value, UploadFile):
+        if key.startswith("files[") and hasattr(value, "filename"):
             print(f"📁 [DEBUG ARCHIVO] Entró al filtro: {key}")
             # Leemos los bytes de forma asíncrona
             contenido_bytes = await value.read()

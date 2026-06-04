@@ -342,7 +342,8 @@ RESPUESTA:
 
 #def generate_response(prompt, model_name="gemini-2.5-flash"):
 def generate_response(prompt, model_name="models/gemini-3-flash-preview", archivos: list = None):
-
+    print('modelo en generate')
+    print(model_name)
     chat_model = genai.GenerativeModel(model_name)
     contenidos_payload = [prompt]
     if archivos:

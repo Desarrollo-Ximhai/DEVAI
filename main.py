@@ -362,7 +362,8 @@ def generate_response(prompt, model_name="models/gemini-3-flash-preview", archiv
 
 def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyecto: str = "default", model_name= "models/gemini-3-flash-preview", historial = '', max_tokens = 6000, archivos = None  ):
     t0 = time.time()
-
+    print('modelo:')
+    print(model_name)
     try:
 
         #basedatos = data.get('basedatos', 'default')
@@ -426,8 +427,8 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
         genai.configure(api_key=KEY_FREE2)
         t6 = time.time()
         # Step 4: generate response
-        print('archivos')
-        print(archivos)
+        #print('archivos')
+        #print(archivos)
 
         response_text = generate_response(prompt, model_name, archivos)
         #print(response_text)
@@ -493,14 +494,14 @@ async def devai_endpoint(request: Request):
     # CAMBIO AQUÍ: Procesamos los archivos a un formato compatible con Gemini
     archivos_procesados = []
     for key, value in form_data.items():
-        print(f"➡️ Llave recibida: '{key}' | Tipo real en Python: {type(value)}")
+        #print(f"➡️ Llave recibida: '{key}' | Tipo real en Python: {type(value)}")
         if key.startswith("files[") and hasattr(value, "filename"):
             print(f"📁 [DEBUG ARCHIVO] Entró al filtro: {key}")
             # Leemos los bytes de forma asíncrona
             contenido_bytes = await value.read()
-            print(f"   | Filename: {getattr(value, 'filename', 'No tiene')}")
-            print(f"   | Content-Type: {getattr(value, 'content_type', 'No tiene')}")
-            print(f"   | Tamaño real leído: {len(contenido_bytes)} bytes")
+            #print(f"   | Filename: {getattr(value, 'filename', 'No tiene')}")
+            #print(f"   | Content-Type: {getattr(value, 'content_type', 'No tiene')}")
+            #print(f"   | Tamaño real leído: {len(contenido_bytes)} bytes")
             archivos_procesados.append({
                 "mime_type": value.content_type,   # Ej: "image/png" o "application/pdf"
                 "data": contenido_bytes           # Los bytes puros del archivo

@@ -359,7 +359,37 @@ def generate_response(prompt, model_name="models/gemini-3-flash-preview", archiv
     tokens = chat_model.count_tokens(payload_total_tokens)
     return response.text
 
+def decontextualize_query(historial_plano, nueva_pregunta, model_name="models/gemini-3.1-flash-lite"):
+    """
+    Toma el historial y la pregunta actual, y devuelve una query optimizada para búsqueda vectorial.
+    """
+    # Convertimos el historial plano a un string legible para el modelo de reformulación
+    historial_texto = ""
+    for turno in historial_plano:
+        historial_texto += f"{turno['role'].upper()}: {turno['content']}\n"
+        
+    prompt_reformador = f"""
+        A continuación se muestra una conversación entre un USUARIO y un ASISTENTE, seguida de una NUEVA PREGUNTA del usuario.
+        Tu única tarea es analizar la conversación y reescribir la NUEVA PREGUNTA para que sea una consulta independiente, clara y rica en contexto, ideal para buscar en una base de datos vectorial.
 
+        REGLAS ESTRICTAS:
+        1. Reemplaza pronombres o referencias ambiguas ("eso", "aquello", "la clase", "el error anterior") por los nombres de los conceptos reales mencionados en el historial.
+        2. Si la NUEVA PREGUNTA ya es independiente y no depende del historial, devuélvela EXACTAMENTE igual, sin añadir nada.
+        3. NO respondas la pregunta. NO agregues saludos ni explicaciones. Devuelve SOLO la pregunta reformulada.
+
+        [HISTORIAL DE CONVERSACIÓN]
+        {historial_texto}
+
+        [NUEVA PREGUNTA]
+        {nueva_pregunta}
+
+        QUERY REFORMULADA OPTIMIZADA:
+        """
+    # Llamada rápida a Gemini
+    model = genai.GenerativeModel(model_name)
+    response = model.generate_content(prompt_reformador)
+    
+    return response.text.strip()
 
 def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyecto: str = "default", model_name= "models/gemini-3-flash-preview", historial = '', max_tokens = 6000, archivos = None  ):
     t0 = time.time()
@@ -375,9 +405,13 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
         if not chat_id:
             return {'error': 'No se recibió un id de chat válido'}, 400
 
+        historialModificado = optimizar_y_aplanar_historial(historial, max_tokens)
+
+        query_para_busqueda = decontextualize_query(historialModificado, user_query)
+        print(f"🔎 Query original: {user_query} -> Query optimizada para Qdrant: {query_para_busqueda}")
 
         # Step 1: embedding the user query
-        
+        user_query = query_para_busqueda
         query_embedding = embed_with_gemini(user_query)
         if query_embedding is None:
             return {'error': 'Failed to generate embedding for query'}, 500
@@ -419,7 +453,7 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
         print("Despues de hacer buscar en memoria:", time.time() - t5)
         # Step 3: build prompt
 
-        historialModificado = optimizar_y_aplanar_historial(historial, max_tokens)
+        
 
         prompt = build_prompt_from_chunks(chunksCodigo, chunksBD, chunksArchivo, user_query, memory, historialModificado)
         #print('prompt:')

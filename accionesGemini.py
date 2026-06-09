@@ -61,8 +61,8 @@ def generate_response(prompt, model_name="models/gemini-3.1-flash-lite", archivo
     print(f"--- Info de la petición ---")
     print(f"Tokens Entrada: {tokens_entrada} | Tokens Salida: {tokens_salida}")
     print(f"───────────────────────────")
-    print('Respuesta:')
-    print(response.text)
+    #print('Respuesta:')
+    #print(response.text)
     # # Opción A: Si solo necesitas el texto como antes, dejas esto:
     # return {"response": response.text, tokens_entrada}
     # return response.text

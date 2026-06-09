@@ -77,7 +77,7 @@ def optimizar_y_aplanar_historial(historial: Any, max_tokens: int):
         
         historial_plano_final = componentes_turno + historial_plano_final
         tokens_acumulados += tokens_turno
-        
+    print(tokens_acumulados)
     return historial_plano_final
 
 
@@ -243,9 +243,9 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
             return {'error': 'Failed to generate embedding for query'}, 500
 
         collection_memory = memoria
-        chunksCodigo = search_in_qdrant(client, codigo, query_embedding, k=10)
-        chunksBD = search_in_qdrant(client, bd, query_embedding768, k=10)
-        chunksArchivo = search_in_qdrant(client, archivo, query_embedding768, k=10)
+        chunksCodigo = search_in_qdrant(client, codigo, query_embedding, k=5)
+        chunksBD = search_in_qdrant(client, bd, query_embedding768, k=5)
+        chunksArchivo = search_in_qdrant(client, archivo, query_embedding768, k=5)
 
         memory = getProjectMemory(
             client=client,

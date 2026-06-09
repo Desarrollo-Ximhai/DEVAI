@@ -47,6 +47,8 @@ def generate_response(prompt, model_name="models/gemini-3.1-flash-lite", archivo
     tokens_totales = uso_tokens.total_token_count
     
     print(f"--- Métrica de Tokens ---")
+    print(f"---- Response completo ---")
+    print(response)
     print(f"Tokens de Entrada (Prompt + Archivos): {tokens_entrada}")
     print(f"Tokens de Salida (Respuesta): {tokens_salida}")
     print(f"Tokens Totales: {tokens_totales}")

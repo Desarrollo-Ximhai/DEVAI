@@ -332,7 +332,7 @@ async def devai_endpoint(request: Request):
 	#print(respuesta)
     return {"response": respuesta}
 
-
+#
 # =================================================================
 # NUEVO APARTADO: ENDPOINT PARA PROMPTS LIBRES (SIN RAG / QDRANT)
 # =================================================================
@@ -349,7 +349,7 @@ def free_prompt_endpoint(request: FreePromptRequest):
             return {"error": "No se recibió un prompt válido"}, 400
         if not request.model_name:
             return {"error": "No se recibió un modelo válido"}, 400        
-            
+
         respuesta_texto = generate_response(request.prompt, request.model_name)
         
         return {"response": respuesta_texto}

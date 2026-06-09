@@ -34,7 +34,6 @@ GOOGLE_API_KEY= os.environ.get('KEY-FREE')
 conectarGemini(GOOGLE_API_KEY)
 conectarQdrant()
 
-top_k = 5
 
 def optimizar_y_aplanar_historial(historial: Any, max_tokens: int):
     """

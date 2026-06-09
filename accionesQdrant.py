@@ -46,7 +46,7 @@ def borrar_por_point_id(client: QdrantClient, collection_name: str, point_id: st
     )
     return resultado
 
-def search_in_qdrant(client, collection_name, query_embedding, k=top_k):
+def search_in_qdrant(client, collection_name, query_embedding, k=5):
     results = client.query_points(
         collection_name=collection_name,
         query=query_embedding,

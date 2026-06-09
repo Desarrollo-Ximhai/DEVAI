@@ -185,6 +185,8 @@ RESPUESTA:
 
 
 def decontextualize_query(historial_plano, nueva_pregunta, model_name="models/gemini-3.1-flash-lite"):
+    global tokens_entrada_acumulados
+    global tokens_salida_acumulados
     """
     Toma el historial y la pregunta actual, y devuelve una query optimizada para búsqueda vectorial.
     """
@@ -217,6 +219,8 @@ def decontextualize_query(historial_plano, nueva_pregunta, model_name="models/ge
 
 def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyecto: str = "default", model_name= "models/gemini-3-flash-preview", historial = '', max_tokens = 6000, archivos = None  ):
     print(model_name)
+    global tokens_entrada_acumulados
+    global tokens_salida_acumulados
     try:
 
         if not user_query:
@@ -275,6 +279,8 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
         return {'error': str(e)}, 500
 
 def enrutar_consulta(user_query: str, historial: str = "", modelo = 'models/gemini-3.1-flash-lite') -> str:
+    global tokens_entrada_acumulados
+    global tokens_salida_acumulados
     """
     Analiza la consulta del usuario y decide si requiere el contexto del framework (RAG)
     o si puede ser respondida directamente por el LLM (FREE).
@@ -369,6 +375,8 @@ async def devai_endpoint(request: Request):
 
 @app.post("/devaiAgent", dependencies=[Depends(verificar_clave)])
 async def devai_endpoint(request: Request):
+    global tokens_entrada_acumulados
+    global tokens_salida_acumulados
     # 1. Extraemos todo el contenido del formulario multipart
     form_data = await request.form()
     
@@ -437,6 +445,8 @@ class FreePromptRequest(BaseModel):
 
 @app.post("/prompt", dependencies=[Depends(verificar_clave)])
 def free_prompt_endpoint(request: FreePromptRequest):
+    global tokens_entrada_acumulados
+    global tokens_salida_acumulados
     conectarGemini()
     try:
         if not request.prompt:

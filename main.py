@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import time
 import os
-import google.generativeai as genai
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Filter, FieldCondition, MatchValue, PointStruct
 import uuid
@@ -13,7 +12,8 @@ from typing import Optional
 import json
 
 #para el borrado de puntos
-from accionesQdrant import borrar_por_chat_id, borrar_por_point_id
+from accionesQdrant import conectarQdrant, borrar_por_chat_id, borrar_por_point_id, search_in_qdrant, save_to_qdrant, getProjectMemory
+from accionesGemini import conectarGemini, generate_response
 
 #para la autenticacion de la API
 from fastapi import Depends
@@ -27,36 +27,14 @@ ADMIN_KEY = os.environ.get("ADMIN_API_KEY")
 def verificar_clave(api_key: str = Header(...)):
     if api_key != ADMIN_KEY:
         raise HTTPException(status_code=403, detail="No autorizado: Clave inválida")
-
-
 QDRANT_URL = os.environ["QDRANT_URL"]
 QDRANT_API_KEY = os.environ.get("QDRANT_API_KEY") 
 KEY_FREE2 = os.environ.get("GOOGLE_API_KEY2") 
 GOOGLE_API_KEY= os.environ.get('KEY-FREE') 
-genai.configure(api_key=GOOGLE_API_KEY)
-
-
-try:
-    qdrant_api_key = QDRANT_API_KEY
-    print("Qdrant API Key obtenida de los secretos de Colab.")
-except:
-    qdrant_api_key = None
-    print("No se encontró 'QDRANT_API_KEY' en los secretos de Colab. Si tu instancia de Qdrant requiere una API Key, asegúrate de haberla guardado correctamente.")
-
-# Conecta con tu Qdrant (local o remoto)
-client = QdrantClient(
-    url= QDRANT_URL,  # o tu URL remota
-    api_key=qdrant_api_key # Pasa la API key durante la inicialización
-)
-
+conectarGemini(GOOGLE_API_KEY)
+conectarQdrant()
 
 top_k = 5
-
-
-class ChatTurn(BaseModel):
-    user: str
-    assistant: str
-
 
 def optimizar_y_aplanar_historial(historial: Any, max_tokens: int):
     """
@@ -102,112 +80,6 @@ def optimizar_y_aplanar_historial(historial: Any, max_tokens: int):
     return historial_plano_final
 
 
-
-def embed_with_gemini(text, dimension=3072):
-    res = genai.embed_content(
-        model='models/gemini-embedding-001',
-        content=text,
-        task_type="retrieval_document",
-        output_dimensionality=dimension
-    )
-    return res["embedding"] if "embedding" in res else None
-
-def search_in_qdrant(client, collection_name, query_embedding, k=top_k):
-    results = client.query_points(
-        collection_name=collection_name,
-        query=query_embedding,
-        limit=k,
-        )
-
-    return results.points 
-
-
-
-
-def guardar_memoria_en_qdrant(client, embed_fn, user_query, collection_memory, respuesta, chat_id, proyecto="default"):
-    
-    textos = [
-        {"role": "user", "text": user_query.strip()},
-        {"role": "assistant", "text": respuesta.strip()},
-    ]
-
-    points = []
-    uuids = []
-    for item in textos:
-        emb = embed_fn(item["text"],768)
-        if emb is None:
-            continue
-        unUUUID = uuid.uuid4()
-        uuids.append(unUUUID)
-        points.append(
-            PointStruct(
-                id=str(unUUUID),
-                vector=emb,
-                payload={
-                    "text": item["text"],
-                    "chat_id": chat_id,
-                    "role": item["role"],
-                    "project": proyecto,
-                    "timestamp": datetime.utcnow().isoformat()
-                }
-            )
-        )
-
-    if not points:
-        print("⚠️ No se generaron embeddings para guardar memoria.")
-        return
-
-    client.upsert(
-        collection_name=collection_memory,
-        points=points,
-        wait=True
-    )
-    print(f"✅ Memoria guardada ({len(points)} puntos) para proyecto '{proyecto}'.")
-    return uuids
-
-
-def recuperar_memoria_proyecto(client, embed_fn, user_query, collection_memory, chat_id, proyecto="default", limit=5):
-    filtros = [
-        FieldCondition(
-            key="role",
-            match=MatchValue(value="assistant")
-        ),
-        
-    ]
-    if proyecto:
-        filtros.append(
-            FieldCondition(
-                key="project",
-                match=MatchValue(value=proyecto)
-            )
-        )
-
-    if chat_id:
-        filtros.append(
-            FieldCondition(
-                key="chat_id",
-                match=MatchValue(value=chat_id)
-            )
-        )
-    query_emb = embed_fn(user_query,768)
-    res = client.query_points(
-        collection_name=collection_memory,
-        query=query_emb,
-        limit=limit,
-        with_payload=True,
-        with_vectors=False,
-        query_filter=Filter(
-            must=filtros
-        )
-    )
-    puntos = res.points
-
-    # ordenar cronológicamente
-    # puntos.sort(
-    #     key=lambda x: x.payload.get("timestamp", 0)
-    # )
-    
-    return puntos
 
 
 def build_prompt_from_chunks(chunksCodigo, chunksBD, chunksArchivo, user_query, memory=None, historial = ''):
@@ -310,24 +182,6 @@ RESPUESTA:
 
 
 
-#def generate_response(prompt, model_name="gemini-2.5-flash"):
-def generate_response(prompt, model_name="models/gemini-3.1-flash-lite", archivos: list = None):
-    print('modelo en generate')
-    print(model_name)
-    chat_model = genai.GenerativeModel(model_name)
-    contenidos_payload = [prompt]
-    if archivos:
-        for arc in archivos:
-            contenidos_payload.append({
-                "mime_type": arc["mime_type"],
-                "data": arc["data"]
-            })
-    convo = chat_model.start_chat()
-    #response = convo.send_message(prompt)
-    response = convo.send_message(contenidos_payload)
-    payload_total_tokens = contenidos_payload + [response.text]
-    tokens = chat_model.count_tokens(payload_total_tokens)
-    return response.text
 
 def decontextualize_query(historial_plano, nueva_pregunta, model_name="models/gemini-3.1-flash-lite"):
     """
@@ -355,10 +209,7 @@ def decontextualize_query(historial_plano, nueva_pregunta, model_name="models/ge
 
         QUERY REFORMULADA OPTIMIZADA:
         """
-    # Llamada rápida a Gemini
-    model = genai.GenerativeModel(model_name)
-    response = model.generate_content(prompt_reformador)
-    
+    response = generate_response(prompt_reformador, model_name)
     return response.text.strip()
 
 def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyecto: str = "default", model_name= "models/gemini-3-flash-preview", historial = '', max_tokens = 6000, archivos = None  ):
@@ -371,11 +222,10 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
             return {'error': 'No se recibió un id de chat válido'}, 400
 
         historialModificado = optimizar_y_aplanar_historial(historial, max_tokens)
-
         query_para_busqueda = decontextualize_query(historialModificado, user_query)
-        print(f"🔎 Query original: {user_query} -> Query optimizada para Qdrant: {query_para_busqueda}")
         user_queryAux = user_query
         user_query = query_para_busqueda
+
         query_embedding = embed_with_gemini(user_query)
         if query_embedding is None:
             return {'error': 'Failed to generate embedding for query'}, 500
@@ -389,7 +239,7 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
         chunksBD = search_in_qdrant(client, bd, query_embedding768, k=10)
         chunksArchivo = search_in_qdrant(client, archivo, query_embedding768, k=10)
 
-        memory = recuperar_memoria_proyecto(
+        memory = getProjectMemory(
             client=client,
             embed_fn=embed_with_gemini,
             user_query=user_query,
@@ -401,13 +251,9 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
         
         user_query = user_queryAux
         prompt = build_prompt_from_chunks(chunksCodigo, chunksBD, chunksArchivo, user_query, memory, historialModificado)
-        genai.configure(api_key=KEY_FREE2)
-        response_text = generate_response(prompt, model_name, archivos)
+        response_text = generate_response(prompt, model_name, archivos)        
        
-        genai.configure(api_key=GOOGLE_API_KEY)
-        
-       
-        uuids = guardar_memoria_en_qdrant(
+        uuids = save_to_qdrant(
             client=client,
             embed_fn=embed_with_gemini,
             user_query=user_query,
@@ -462,22 +308,12 @@ async def devai_endpoint(request: Request):
     # CAMBIO AQUÍ: Procesamos los archivos a un formato compatible con Gemini
     archivos_procesados = []
     for key, value in form_data.items():
-        #print(f"➡️ Llave recibida: '{key}' | Tipo real en Python: {type(value)}")
         if key.startswith("files[") and hasattr(value, "filename"):
-            print(f"📁 [DEBUG ARCHIVO] Entró al filtro: {key}")
-            # Leemos los bytes de forma asíncrona
             contenido_bytes = await value.read()
-            #print(f"   | Filename: {getattr(value, 'filename', 'No tiene')}")
-            #print(f"   | Content-Type: {getattr(value, 'content_type', 'No tiene')}")
-            #print(f"   | Tamaño real leído: {len(contenido_bytes)} bytes")
             archivos_procesados.append({
-                "mime_type": value.content_type,   # Ej: "image/png" o "application/pdf"
-                "data": contenido_bytes           # Los bytes puros del archivo
+                "mime_type": value.content_type,   
+                "data": contenido_bytes          
             })
-
-    # En este punto, 'archivos_recibidos' es una lista limpia de objetos UploadFile de FastAPI
-    # [UploadFile(filename="archivo1.pdf", ...), UploadFile(filename="imagen.png", ...)]
-
 
     respuesta = query_rag(
 		user_query=query,
@@ -505,26 +341,16 @@ class FreePromptRequest(BaseModel):
     prompt: str
     model_name: str 
 
-def generate_free_response(prompt_text: str, model_name: str):
-    genai.configure(api_key=KEY_FREE2)
-    chat_model = genai.GenerativeModel(model_name)
-    response = chat_model.generate_content(prompt_text)
-    
-    return response.text
-
 @app.post("/prompt", dependencies=[Depends(verificar_clave)])
 def free_prompt_endpoint(request: FreePromptRequest):
-    """
-    Endpoint para enviar cualquier prompt directo a Gemini.
-    """
+    conectarGemini()
     try:
         if not request.prompt:
             return {"error": "No se recibió un prompt válido"}, 400
         if not request.model_name:
-            return {"error": "No se recibió un modelo válido"}, 400
-        
-        print(f"Recibiendo prompt libre: {request.prompt}")
-        respuesta_texto = generate_free_response(request.prompt, request.model_name)
+            return {"error": "No se recibió un modelo válido"}, 400        
+            
+        respuesta_texto = generate_response(request.prompt, request.model_name)
         
         return {"response": respuesta_texto}
         

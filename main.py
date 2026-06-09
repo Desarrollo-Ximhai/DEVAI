@@ -31,16 +31,11 @@ def verificar_clave(api_key: str = Header(...)):
 
 QDRANT_URL = os.environ["QDRANT_URL"]
 QDRANT_API_KEY = os.environ.get("QDRANT_API_KEY") 
-KEY_FREE = os.environ.get("KEY_FREE") 
 KEY_FREE2 = os.environ.get("GOOGLE_API_KEY2") 
 GOOGLE_API_KEY= os.environ.get('KEY-FREE') 
-
-
-# Configure Gemini globally with GOOGLE_API_KEY for embedding operations
 genai.configure(api_key=GOOGLE_API_KEY)
 
 
-# Retrieve Qdrant API key from Colab secrets
 try:
     qdrant_api_key = QDRANT_API_KEY
     print("Qdrant API Key obtenida de los secretos de Colab.")
@@ -68,14 +63,12 @@ def optimizar_y_aplanar_historial(historial: Any, max_tokens: int):
     Parsea, limpia y aplana el historial sin importar si viene como 
     String JSON o como lista de diccionarios desde PHP.
     """
-    # Si viene como un String de texto debido a un json_encode en PHP, lo convertimos a lista
     if isinstance(historial, str):
         try:
             historial = json.loads(historial)
         except Exception:
-            return [], 0  # Si el JSON está mal formado, devolvemos historial vacío
+            return [], 0 
             
-    # Si después de intentar parsearlo no es una lista, abortamos pacíficamente
     if not isinstance(historial, list):
         return [], 0
 
@@ -83,33 +76,26 @@ def optimizar_y_aplanar_historial(historial: Any, max_tokens: int):
     historial_plano_final = []
     tokens_acumulados = 0
     
-    # Iteramos los turnos de atrás hacia adelante (del más nuevo al más viejo)
     for turno in reversed(historial):
         
-        # Nos aseguramos de que el elemento sea un diccionario/objeto válido
         if isinstance(turno, dict):
             u_text = turno.get("user", "")
             a_text = turno.get("assistant", "")
         else:
-            # Si hay basura dentro de la lista, la saltamos
             continue
             
-        # Calculamos tokens
         tokens_user = len(encoding.encode(str(u_text))) + 4
         tokens_assistant = len(encoding.encode(str(a_text))) + 4
         tokens_turno = tokens_user + tokens_assistant
         
-        # Si supera el límite de tokens pasados desde PHP, cortamos el pasado
         if tokens_acumulados + tokens_turno > max_tokens:
             break
             
-        # Estructuramos al formato plano clásico que le gusta a Gemini/OpenAI
         componentes_turno = [
             {"role": "user", "content": u_text},
             {"role": "assistant", "content": a_text}
         ]
         
-        # Los inyectamos al principio para mantener el orden cronológico
         historial_plano_final = componentes_turno + historial_plano_final
         tokens_acumulados += tokens_turno
         
@@ -118,8 +104,6 @@ def optimizar_y_aplanar_historial(historial: Any, max_tokens: int):
 
 
 def embed_with_gemini(text, dimension=3072):
-    """Devuelve un embedding del texto usando Gemini."""
-    # genai.embed_content usará la clave globalmente configurada (GOOGLE_API_KEY)
     res = genai.embed_content(
         model='models/gemini-embedding-001',
         content=text,
@@ -129,26 +113,19 @@ def embed_with_gemini(text, dimension=3072):
     return res["embedding"] if "embedding" in res else None
 
 def search_in_qdrant(client, collection_name, query_embedding, k=top_k):
-    """Busca los k chunks más relevantes en Qdrant para el embedding dado."""
-    print("Buscando en ")
-    print(collection_name)
     results = client.query_points(
         collection_name=collection_name,
         query=query_embedding,
         limit=k,
         )
 
-    return results.points # This line was modified to access the 'points' attribute
-
+    return results.points 
 
 
 
 
 def guardar_memoria_en_qdrant(client, embed_fn, user_query, collection_memory, respuesta, chat_id, proyecto="default"):
-    """
-    Guarda en Qdrant un turno de conversación (usuario + asistente) como memoria semántica.
-    embed_fn: función que recibe texto y regresa embedding (por ejemplo, embed_with_gemini)
-    """
+    
     textos = [
         {"role": "user", "text": user_query.strip()},
         {"role": "assistant", "text": respuesta.strip()},
@@ -190,10 +167,6 @@ def guardar_memoria_en_qdrant(client, embed_fn, user_query, collection_memory, r
 
 
 def recuperar_memoria_proyecto(client, embed_fn, user_query, collection_memory, chat_id, proyecto="default", limit=5):
-    """
-    Recupera memoria relevante para un proyecto dado, usando query_points.
-    Regresa una lista de puntos (ScoredPoint-like) que luego pasas a build_prompt_from_chunks como `memory`.
-    """
     filtros = [
         FieldCondition(
             key="role",
@@ -230,11 +203,10 @@ def recuperar_memoria_proyecto(client, embed_fn, user_query, collection_memory, 
     puntos = res.points
 
     # ordenar cronológicamente
-    puntos.sort(
-        key=lambda x: x.payload.get("timestamp", 0)
-    )
-    print("puntos que trajo la BD")
-    print(puntos)
+    # puntos.sort(
+    #     key=lambda x: x.payload.get("timestamp", 0)
+    # )
+    
     return puntos
 
 
@@ -293,8 +265,6 @@ def build_prompt_from_chunks(chunksCodigo, chunksBD, chunksArchivo, user_query, 
             "\n\n---\n"
         )
 
-
-    #print(memoria)
     prompt = f"""
 Eres un asistente de desarrollo extremadamente preciso y especializado en interpretar código PHP, HTML y SQL dentro de un framework personalizado.
 
@@ -341,7 +311,7 @@ RESPUESTA:
 
 
 #def generate_response(prompt, model_name="gemini-2.5-flash"):
-def generate_response(prompt, model_name="models/gemini-3-flash-preview", archivos: list = None):
+def generate_response(prompt, model_name="models/gemini-3.1-flash-lite", archivos: list = None):
     print('modelo en generate')
     print(model_name)
     chat_model = genai.GenerativeModel(model_name)
@@ -392,13 +362,8 @@ def decontextualize_query(historial_plano, nueva_pregunta, model_name="models/ge
     return response.text.strip()
 
 def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyecto: str = "default", model_name= "models/gemini-3-flash-preview", historial = '', max_tokens = 6000, archivos = None  ):
-    t0 = time.time()
-    print('modelo:')
     print(model_name)
     try:
-
-        #basedatos = data.get('basedatos', 'default')
-        #codigo = data.get('codigo', false)
 
         if not user_query:
             return {'error': 'No se recibió un prompt válido'}, 400
@@ -409,38 +374,21 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
 
         query_para_busqueda = decontextualize_query(historialModificado, user_query)
         print(f"🔎 Query original: {user_query} -> Query optimizada para Qdrant: {query_para_busqueda}")
-
-        # Step 1: embedding the user query
+        user_queryAux = user_query
         user_query = query_para_busqueda
         query_embedding = embed_with_gemini(user_query)
         if query_embedding is None:
             return {'error': 'Failed to generate embedding for query'}, 500
-        print("Embedding:", time.time() - t0)
 
-        t1 = time.time()
         query_embedding768 = embed_with_gemini(user_query,768)
         if query_embedding is None:
             return {'error': 'Failed to generate embedding for query'}, 500
-        print("Embedding2:", time.time() - t1)
 
-        #DEVAI-embeddings
-
-        #DevAI-Memory
         collection_memory = memoria
-        # Step 2: retrieval from Qdrant
-        t2 = time.time()
         chunksCodigo = search_in_qdrant(client, codigo, query_embedding, k=10)
-        print("En codigo:", time.time() - t2)
-        t3 = time.time()
         chunksBD = search_in_qdrant(client, bd, query_embedding768, k=10)
-        print("En bd:", time.time() - t3)
-        t4 = time.time()
         chunksArchivo = search_in_qdrant(client, archivo, query_embedding768, k=10)
-        print("En Archivo:", time.time() - t4)
 
-        print("Despues de hacer buscar en qdrant")
-        t5 = time.time()
-        # Step 2.5: retrieval of memory
         memory = recuperar_memoria_proyecto(
             client=client,
             embed_fn=embed_with_gemini,
@@ -450,28 +398,15 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
             proyecto=proyecto,
             limit=8
         )
-        print("Despues de hacer buscar en memoria:", time.time() - t5)
-        # Step 3: build prompt
-
         
-
+        user_query = user_queryAux
         prompt = build_prompt_from_chunks(chunksCodigo, chunksBD, chunksArchivo, user_query, memory, historialModificado)
-        #print('prompt:')
-        #print(prompt)
-        # Configure Gemini for response generation (using KEY_FREE2)
         genai.configure(api_key=KEY_FREE2)
-        t6 = time.time()
-        # Step 4: generate response
-        #print('archivos')
-        #print(archivos)
-
         response_text = generate_response(prompt, model_name, archivos)
-        #print(response_text)
-        # Configure Gemini back for embedding (using GOOGLE_API_KEY)
+       
         genai.configure(api_key=GOOGLE_API_KEY)
-        print("Despues de respuesta:", time.time() - t6)
-        # Step 5: save conversation memory
-        t7 = time.time()
+        
+       
         uuids = guardar_memoria_en_qdrant(
             client=client,
             embed_fn=embed_with_gemini,
@@ -481,12 +416,10 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
             chat_id=chat_id,
             proyecto=proyecto
         )
-        print("Acaba:", time.time() - t7)
         return {'response': response_text, 'uuids' : uuids}, 200
 
     except Exception as e:
         return {'error': str(e)}, 500
-	
 
 app = FastAPI()
 
@@ -499,7 +432,7 @@ class QueryRequest(BaseModel):
     bd:str = "DevAI-DB"
     archivo:str = "DevAI-Analisis" 
     proyecto: str = "default"
-    model_name: str = "models/gemini-3-flash-preview"
+    model_name: str = "models/gemini-3.1-flash-lite"
     historial: str = ""
     max_tokens: int = 6000
 

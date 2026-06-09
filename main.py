@@ -13,7 +13,7 @@ import json
 
 #para el borrado de puntos
 from accionesQdrant import conectarQdrant, borrar_por_chat_id, borrar_por_point_id, search_in_qdrant, save_to_qdrant, getProjectMemory
-from accionesGemini import conectarGemini, generate_response
+from accionesGemini import conectarGemini, generate_response, embed_with_gemini
 
 #para la autenticacion de la API
 from fastapi import Depends

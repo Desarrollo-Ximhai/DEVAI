@@ -243,7 +243,7 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
             return {'error': 'Failed to generate embedding for query'}, 500
 
         collection_memory = memoria
-        chunksCodigo = search_in_qdrant(client, codigo, query_embedding, k=5)
+        chunksCodigo = search_in_qdrant(client, codigo, query_embedding, k=8)
         chunksBD = search_in_qdrant(client, bd, query_embedding768, k=5)
         chunksArchivo = search_in_qdrant(client, archivo, query_embedding768, k=5)
 
@@ -254,7 +254,7 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
             collection_memory=collection_memory,
             chat_id=chat_id,
             proyecto=proyecto,
-            limit=8
+            limit=4
         )
         
         user_query = user_queryAux
@@ -331,10 +331,8 @@ def health():
 
 @app.post("/devai", dependencies=[Depends(verificar_clave)])
 async def devai_endpoint(request: Request):
-    # 1. Extraemos todo el contenido del formulario multipart
     form_data = await request.form()
     
-    # 2. Extraemos los campos de texto con los mismos valores por defecto que tenías
     query = form_data.get("query", "")
     memoria = form_data.get("memoria", "DevAI-Memory")
     chat_id = int(form_data.get("chat_id", 0))
@@ -346,7 +344,6 @@ async def devai_endpoint(request: Request):
     historial = form_data.get("historial", "")
     max_tokens = int(form_data.get("max_tokens", 6000))
 
-    # CAMBIO AQUÍ: Procesamos los archivos a un formato compatible con Gemini
     archivos_procesados = []
     for key, value in form_data.items():
         if key.startswith("files[") and hasattr(value, "filename"):

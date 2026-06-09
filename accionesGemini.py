@@ -1,9 +1,11 @@
 import google.generativeai as genai
 
 def conectarGemini(key):
+    print("--Conectando Gemini")
     genai.configure(api_key=key)
 
 def embedForCode(text):
+    print('--Embebiendo para codigo')
     res = genai.embed_content(
         model='models/gemini-embedding-001',
         content=text,

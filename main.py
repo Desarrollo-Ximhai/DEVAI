@@ -266,20 +266,42 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
     except Exception as e:
         return {'error': str(e)}, 500
 
-app = FastAPI()
+def enrutar_consulta(user_query: str, historial: str = "", modelo = 'models/gemini-3.1-flash-lite') -> str:
+    """
+    Analiza la consulta del usuario y decide si requiere el contexto del framework (RAG)
+    o si puede ser respondida directamente por el LLM (FREE).
+    """
+    prompt_router = f"""
+    Actúas como un clasificador de consultas de alta precisión para un sistema de desarrollo de software.
+    Tu única tarea es analizar la NUEVA PREGUNTA del usuario (y el historial si es necesario) y determinar si para responderla se requiere buscar información específica dentro del código fuente, la estructura de la base de datos o los análisis del framework personalizado del usuario.
 
-#Esta clase ya no se usa, agarramos los datos directo del request.
-class QueryRequest(BaseModel):
-    query: str
-    memoria:str ="DevAI-Memory"
-    chat_id:int
-    codigo:str = "DEVAI-embeddings"
-    bd:str = "DevAI-DB"
-    archivo:str = "DevAI-Analisis" 
-    proyecto: str = "default"
-    model_name: str = "models/gemini-3.1-flash-lite"
-    historial: str = ""
-    max_tokens: int = 6000
+    RESPONDE ÚNICAMENTE CON UNA DE ESTAS DOS PALABRAS:
+    - 'RAG': Si la pregunta menciona componentes, vistas, clases, tablas específicas, lógica del framework personalizado, o frases como "cómo se arma la consulta en X tabla".
+    - 'FREE': Si es una pregunta de conocimiento general de programación, dudas sobre APIs externas (ej. precios o modelos de Gemini), saludos, o charlas generales que el modelo puede responder con su propio conocimiento sin ver el framework.
+
+    [HISTORIAL RECIENTE]
+    {historial}
+
+    [NUEVA PREGUNTA]
+    {user_query}
+
+    DECISIÓN (Escribe solo RAG o FREE):"""
+
+    try:
+        # Usamos el modelo más rápido disponible para no penalizar la latencia
+        response = generate_response(prompt_router, modelo)
+        decision = response.text.strip().upper()
+        
+        # Sanitizamos la respuesta por si el LLM añade puntos o espacios
+        if "RAG" in decision:
+            return "RAG"
+        return "FREE"
+    except Exception as e:
+        print(f"⚠️ Error en el router, desviando a RAG por seguridad: {e}")
+        return "RAG" # Por seguridad, si falla el router, usamos el RAG
+
+
+app = FastAPI()
 
 @app.get("/health")
 def health():
@@ -314,6 +336,63 @@ async def devai_endpoint(request: Request):
                 "data": contenido_bytes          
             })
 
+    respuesta = query_rag(
+		user_query=query,
+		memoria=memoria,
+		chat_id=chat_id,
+		codigo=codigo,
+		bd=bd,
+		archivo=archivo,
+		proyecto=proyecto,
+        model_name=model_name,
+        historial=historial,
+        max_tokens=max_tokens,
+        archivos=archivos_procesados
+        )
+	#print('respuesta')
+	#print(respuesta)
+    return {"response": respuesta}
+
+
+@app.post("/devaiAgent", dependencies=[Depends(verificar_clave)])
+async def devai_endpoint(request: Request):
+    # 1. Extraemos todo el contenido del formulario multipart
+    form_data = await request.form()
+    
+    # 2. Extraemos los campos de texto con los mismos valores por defecto que tenías
+    query = form_data.get("query", "")
+    memoria = form_data.get("memoria", "DevAI-Memory")
+    chat_id = int(form_data.get("chat_id", 0))
+    codigo = form_data.get("codigo", "DEVAI-embeddings")
+    bd = form_data.get("basedatos", form_data.get("bd", "DevAI-DB"))
+    archivo = form_data.get("analisis", form_data.get("archivo", "DevAI-Analisis"))
+    proyecto = form_data.get("proyecto", "default")
+    model_name = form_data.get("model_name", "models/gemini-3.1-flash-lite")
+    historial = form_data.get("historial", "")
+    max_tokens = int(form_data.get("max_tokens", 6000))
+
+    # CAMBIO AQUÍ: Procesamos los archivos a un formato compatible con Gemini
+    archivos_procesados = []
+    for key, value in form_data.items():
+        if key.startswith("files[") and hasattr(value, "filename"):
+            contenido_bytes = await value.read()
+            archivos_procesados.append({
+                "mime_type": value.content_type,   
+                "data": contenido_bytes          
+            })
+
+
+    ruta = enrutar_consulta(query, historial)
+    print(f"🤖 [ROUTER SEMÁNTICO] Consulta: '{query}' -> Clasificada como: {ruta}")
+
+    if ruta == "FREE":
+        print('Entrando en respuesta FREE')
+        # CASO 1: Es una pregunta general (Ej: Modelos de paga de Gemini)
+        # Consumimos directamente tu función de prompt libre (sin tocar Qdrant)
+        response = generate_response(query, model_name)
+        return {'response': response_texto, 'uuids' : uuids}, 200
+
+    print('Entrando en respuesta RAG')
     respuesta = query_rag(
 		user_query=query,
 		memoria=memoria,

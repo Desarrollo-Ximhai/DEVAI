@@ -52,23 +52,27 @@ def generate_response(prompt, model_name="models/gemini-3.1-flash-lite", archivo
                 "mime_type": arc["mime_type"],
                 "data": arc["data"]
             })
-            
-    # CAMBIO CLAVE: Usamos generate_content en lugar de start_chat()
-    # Esto es mucho más estable para arquitecturas RAG
+    
+    # CAMBIO AQUÍ: Eliminamos start_chat() y mandamos el payload directo.
+    # Esto garantiza que 'response' sea SIEMPRE el objeto correcto con .text y .usage_metadata
     response = chat_model.generate_content(contenidos_payload)
     
-    # Validamos que la respuesta tenga contenido para evitar el error de 'str'
-    if not response.text:
-        print("Error: El modelo no devolvió texto. Revisar seguridad o formato de archivos.")
-        return "Lo siento, no pude generar una respuesta."
-        
-    # Extraemos los tokens de forma segura
+    # Extraemos los tokens directamente de los metadatos de la respuesta (sin peticiones extra)
     uso_tokens = response.usage_metadata
-    print(f"--- Tokens ---")
-    print(f"--- Respuesta ---")
-    print(response)
-    print(f"--- Tokens ---")
-    print(f"Entrada: {uso_tokens.prompt_token_count} | Salida: {uso_tokens.candidates_token_count}")
-    print(f"──────────────")
+    tokens_entrada = uso_tokens.prompt_token_count
+    tokens_salida = uso_tokens.candidates_token_count
     
+    print(f"--- Info de la petición ---")
+    print(f"Tokens Entrada: {tokens_entrada} | Tokens Salida: {tokens_salida}")
+    print(f"───────────────────────────")
+    print('Respuesta:')
+    print(response.text)
+    # Opción A: Si solo necesitas el texto como antes, dejas esto:
     return response.text
+
+    # Opción B (Recomendada para tu RAG): Si necesitas los tokens en tu lógica principal:
+    # return {
+    #     "texto": response.text,
+    #     "tokens_entrada": tokens_entrada,
+    #     "tokens_salida": tokens_salida
+    # }

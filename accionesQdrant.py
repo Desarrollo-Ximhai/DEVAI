@@ -2,6 +2,8 @@
 import uuid
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Filter, FieldCondition, MatchValue
+from qdrant_client.http.models import Filter, FieldCondition, MatchValue, PointStruct
+
 
 def conectarQdrant(qdrant_url, qdrant_api_key):
     try:

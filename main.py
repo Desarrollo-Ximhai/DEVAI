@@ -448,7 +448,7 @@ class FreePromptRequest(BaseModel):
 def free_prompt_endpoint(request: FreePromptRequest):
     global tokens_entrada_acumulados
     global tokens_salida_acumulados
-    conectarGemini()
+    conectarGemini(KEY_FREE2)
     try:
         if not request.prompt:
             return {"error": "No se recibió un prompt válido"}, 400

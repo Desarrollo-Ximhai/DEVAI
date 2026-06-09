@@ -15,6 +15,7 @@ def conectarQdrant(qdrant_url, qdrant_api_key):
         url= qdrant_url,  # o tu URL remota
         api_key=qdrant_api_key # Pasa la API key durante la inicialización
     )
+    return client
 
 def borrar_por_chat_id(client: QdrantClient, collection_name: str, chat_id: int):
     """

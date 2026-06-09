@@ -34,7 +34,7 @@ GOOGLE_API_KEY= os.environ.get('KEY-FREE')
 tokens_entrada_acumulados =0
 tokens_salida_acumulados =0
 conectarGemini(GOOGLE_API_KEY)
-conectarQdrant(QDRANT_URL, QDRANT_API_KEY)
+client = conectarQdrant(QDRANT_URL, QDRANT_API_KEY)
 
 
 def optimizar_y_aplanar_historial(historial: Any, max_tokens: int):
@@ -221,6 +221,7 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
     print(model_name)
     global tokens_entrada_acumulados
     global tokens_salida_acumulados
+    global client
     try:
 
         if not user_query:
@@ -479,6 +480,7 @@ class BorrarPuntoRequest(BaseModel):
 
 @app.post("/borrar_chat", dependencies=[Depends(verificar_clave)])
 def endpoint_borrar_chat(request: BorrarChatRequest):
+    global client
     """Endpoint para borrar todo el historial de un chat por ID."""
     try:
         res = borrar_por_chat_id(client, request.collection_name, request.chat_id)

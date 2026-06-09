@@ -3,6 +3,7 @@ import uuid
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Filter, FieldCondition, MatchValue
 from qdrant_client.http.models import Filter, FieldCondition, MatchValue, PointStruct
+from datetime import datetime
 
 
 def conectarQdrant(qdrant_url, qdrant_api_key):

@@ -2,9 +2,9 @@
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Filter, FieldCondition, MatchValue
 
-def conectarQdrant():
+def conectarQdrant(qdrant_url, qdrant_api_key):
     try:
-        qdrant_api_key = QDRANT_API_KEY
+        qdrant_api_key = qdrant_api_key
         print("Qdrant API Key obtenida de los secretos de Colab.")
     except:
         qdrant_api_key = None
@@ -12,7 +12,7 @@ def conectarQdrant():
 
     # Conecta con tu Qdrant (local o remoto)
     client = QdrantClient(
-        url= QDRANT_URL,  # o tu URL remota
+        url= qdrant_url,  # o tu URL remota
         api_key=qdrant_api_key # Pasa la API key durante la inicialización
     )
 

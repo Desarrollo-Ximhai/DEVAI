@@ -31,6 +31,8 @@ QDRANT_URL = os.environ["QDRANT_URL"]
 QDRANT_API_KEY = os.environ.get("QDRANT_API_KEY") 
 KEY_FREE2 = os.environ.get("GOOGLE_API_KEY2") 
 GOOGLE_API_KEY= os.environ.get('KEY-FREE') 
+tokens_entrada_acumulados =0
+tokens_salida_acumulados =0
 conectarGemini(GOOGLE_API_KEY)
 conectarQdrant(QDRANT_URL, QDRANT_API_KEY)
 
@@ -209,7 +211,9 @@ def decontextualize_query(historial_plano, nueva_pregunta, model_name="models/ge
         QUERY REFORMULADA OPTIMIZADA:
         """
     response = generate_response(prompt_reformador, model_name)
-    return response.text.strip()
+    tokens_entrada_acumulados += response["tokens_entrada"]
+    tokens_salida_acumulados += response["tokens_salida"]
+    return response["texto"].strip()
 
 def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyecto: str = "default", model_name= "models/gemini-3-flash-preview", historial = '', max_tokens = 6000, archivos = None  ):
     print(model_name)
@@ -250,8 +254,12 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
         
         user_query = user_queryAux
         prompt = build_prompt_from_chunks(chunksCodigo, chunksBD, chunksArchivo, user_query, memory, historialModificado)
-        response_text = generate_response(prompt, model_name, archivos)        
-       
+        response = generate_response(prompt, model_name, archivos)        
+
+        tokens_entrada_acumulados += response["tokens_entrada"]
+        tokens_salida_acumulados += response["tokens_salida"]
+        response_text = response["texto"].strip()
+
         uuids = save_to_qdrant(
             client=client,
             embed_fn=embed_with_gemini,
@@ -261,7 +269,7 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
             chat_id=chat_id,
             proyecto=proyecto
         )
-        return {'response': response_text, 'uuids' : uuids}, 200
+        return {'response': response_text, 'uuids' : uuids, 'tokens_entrada' : tokens_entrada_acumulados, 'tokens_salida': tokens_salida_acumulados}, 200
 
     except Exception as e:
         return {'error': str(e)}, 500
@@ -290,7 +298,12 @@ def enrutar_consulta(user_query: str, historial: str = "", modelo = 'models/gemi
     try:
         # Usamos el modelo más rápido disponible para no penalizar la latencia
         response = generate_response(prompt_router, modelo)
-        decision = response.text.strip().upper()
+
+        tokens_entrada_acumulados += response["tokens_entrada"]
+        tokens_salida_acumulados += response["tokens_salida"]
+        response = response["texto"].strip()
+
+        decision = response.upper()
         
         # Sanitizamos la respuesta por si el LLM añade puntos o espacios
         if "RAG" in decision:
@@ -390,7 +403,10 @@ async def devai_endpoint(request: Request):
         # CASO 1: Es una pregunta general (Ej: Modelos de paga de Gemini)
         # Consumimos directamente tu función de prompt libre (sin tocar Qdrant)
         response = generate_response(query, model_name)
-        return {'response': response_texto, 'uuids' : uuids}, 200
+        tokens_entrada_acumulados += response["tokens_entrada"]
+        tokens_salida_acumulados += response["tokens_salida"]
+        response = response["texto"].strip()
+        return {'response': response, 'uuids' : uuids}, 200
 
     print('Entrando en respuesta RAG')
     respuesta = query_rag(
@@ -428,9 +444,13 @@ def free_prompt_endpoint(request: FreePromptRequest):
         if not request.model_name:
             return {"error": "No se recibió un modelo válido"}, 400        
 
-        respuesta_texto = generate_response(request.prompt, request.model_name)
+        response = generate_response(request.prompt, request.model_name)
         
-        return {"response": respuesta_texto}
+        tokens_entrada_acumulados += response["tokens_entrada"]
+        tokens_salida_acumulados += response["tokens_salida"]
+        response = response["texto"].strip()
+        
+        return {"response": response}
         
     except Exception as e:
         return {"error": str(e)}, 500

@@ -268,6 +268,9 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
         
         user_query = user_queryAux
         prompt = build_prompt_from_chunks(chunksCodigo, chunksBD, chunksArchivo, user_query, memory, historialModificado)
+        debug('_____________________________________________________')
+        debug(prompt)
+        debug('_____________________________________________________')
         response = generate_response(prompt, model_name, archivos)        
 
         tokens_entrada_acumulados += response["tokens_entrada"]

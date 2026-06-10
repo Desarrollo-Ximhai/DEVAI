@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import time
 import os
+from funciones import debug
+
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Filter, FieldCondition, MatchValue, PointStruct
 import uuid
@@ -36,10 +38,7 @@ tokens_salida_acumulados =0
 conectarGemini(GOOGLE_API_KEY)
 client = conectarQdrant(QDRANT_URL, QDRANT_API_KEY)
 
-def debug(debug):
-    showLogs = True
-    if(showLogs):
-        print(debug)
+
 
 def optimizar_y_aplanar_historial(historial: Any, max_tokens: int):
     """

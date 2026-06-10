@@ -6,10 +6,11 @@ from qdrant_client.http import models
 from datetime import datetime
 from fastembed.sparse import SparseTextEmbedding
 from flashrank import Ranker, RerankRequest
-from main import debug
-
+from funciones import debug
 sparse_model = SparseTextEmbedding(model_name="Qdrant/bm25")
 ranker = Ranker(model_name="ms-marco-MiniLM-L-6-v2")
+
+
 
 def conectarQdrant(qdrant_url, qdrant_api_key):
     try:

@@ -1,4 +1,5 @@
 import google.generativeai as genai
+from funciones import debug
 
 def conectarGemini(key):
     print("--Conectando Gemini")

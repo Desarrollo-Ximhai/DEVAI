@@ -88,27 +88,31 @@ def optimizar_y_aplanar_historial(historial: Any, max_tokens: int):
 
 
 def build_prompt_from_chunks(chunksCodigo, chunksBD, chunksArchivo, user_query, memory=None, historial = ''):
+
+    def extraer_texto(chunk):
+        if isinstance(chunk, dict):
+            return chunk.get("text", "")  
+        elif hasattr(chunk, "payload") and chunk.payload:
+            return chunk.payload.get("text", "")  
+        return ""
+
     contextCodigo = "\n\n---\n\n".join([
-        chunk.payload["text"] for chunk in chunksCodigo
-        if chunk.payload and "text" in chunk.payload
+        extraer_texto(chunk) for chunk in chunksCodigo if extraer_texto(chunk)
     ])
 
     contextBD = "\n\n---\n\n".join([
-        chunk.payload["text"] for chunk in chunksBD
-        if chunk.payload and "text" in chunk.payload
+        extraer_texto(chunk) for chunk in chunksBD if extraer_texto(chunk)
     ])
 
     contextoArchivo = "\n\n---\n\n".join([
-        chunk.payload["text"] for chunk in chunksArchivo
-        if chunk.payload and "text" in chunk.payload
+        extraer_texto(chunk) for chunk in chunksArchivo if extraer_texto(chunk)
     ])
 
     memoria = ""
     if memory and len(memory) > 0:
         memoria = "\n\n".join([
-            f"[{i+1}] {chunk.payload['text']}"
-            for i, chunk in enumerate(memory)
-            if chunk.payload and "text" in chunk.payload
+            f"[{i+1}] {extraer_texto(chunk)}"
+            for i, chunk in enumerate(memory) if extraer_texto(chunk)
         ])
 
     memoria_block = ""
@@ -136,7 +140,7 @@ def build_prompt_from_chunks(chunksCodigo, chunksBD, chunksArchivo, user_query, 
 
     archivo_block = ""
     if contextoArchivo:
-        codigo_archivo = (
+        archivo_block = (
             "[ANALISIS] CONTEXTO DE ANÁLISIS:\n"
             + contextoArchivo +
             "\n\n---\n"
@@ -249,9 +253,9 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
             return {'error': 'Failed to generate embedding 768 for query'}, 500
 
         collection_memory = memoria
-        chunksCodigo = search_in_qdrant(client, codigo, user_query, query_embedding, None, k=8 )
-        chunksBD = search_in_qdrant(client, bd,  user_query, query_embedding768, proyecto , k=10)
-        chunksArchivo = search_in_qdrant(client, archivo,  user_query, query_embedding768, None, k=5)
+        chunksCodigo = search_in_qdrant(client, codigo, user_query, query_embedding, None, k=25 )
+        chunksBD = search_in_qdrant(client, bd,  user_query, query_embedding768, proyecto , k=25)
+        chunksArchivo = search_in_qdrant(client, archivo,  user_query, query_embedding768, None, k=0)
 
         memory = getProjectMemory(
             client=client,

@@ -5,6 +5,8 @@ from qdrant_client.http.models import Filter, FieldCondition, MatchValue, PointS
 from qdrant_client.http import models 
 from datetime import datetime
 from fastembed.sparse import SparseTextEmbedding
+from flashrank import Ranker, RerankRequest
+from main import debug
 
 def conectarQdrant(qdrant_url, qdrant_api_key):
     try:
@@ -91,8 +93,24 @@ def search_in_qdrant(client, collection_name, user_query, query_embedding, proye
             must=filtros
         )
     )
+    debug(f"Busqueda en qdrant con k:{k}" )
+
+    #Reranking
+    ranker = Ranker(model_name="ms-marco-MiniLM-L-6-v2")
+    passages = [
+        {
+            "id": i,
+            "text": chunk.payload["text"],
+            "meta": chunk.payload  
+        }
+        for i, chunk in enumerate(result.points) if chunk.payload
+    ]
+
+    rerank_request = RerankRequest(query=query_para_busqueda, passages=passages)
+    results = ranker.rerank(rerank_request)
+    nuevosPuntos = results[:4]
     
-    return results.points
+    return nuevosPuntos
 
 def save_to_qdrant(client, embed_fn, user_query, collection_memory, respuesta, chat_id, proyecto="default"):
     

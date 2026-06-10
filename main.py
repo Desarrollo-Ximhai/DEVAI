@@ -244,7 +244,7 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
 
         collection_memory = memoria
         chunksCodigo = search_in_qdrant(client, codigo, query_embedding, k=8)
-        chunksBD = search_in_qdrant(client, bd, query_embedding768, k=5)
+        chunksBD = search_in_qdrant(client, bd, query_embedding768, k=8)
         chunksArchivo = search_in_qdrant(client, archivo, query_embedding768, k=5)
 
         memory = getProjectMemory(
@@ -412,7 +412,7 @@ async def devai_endpoint(request: Request):
         tokens_entrada_acumulados += response["tokens_entrada"]
         tokens_salida_acumulados += response["tokens_salida"]
         response = response["texto"].strip()
-        return {'response': response, 'uuids' : uuids}, 200
+        return {'response': response}, 200
 
     print('Entrando en respuesta RAG')
     respuesta = query_rag(

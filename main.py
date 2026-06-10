@@ -249,9 +249,9 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
             return {'error': 'Failed to generate embedding 768 for query'}, 500
 
         collection_memory = memoria
-        chunksCodigo = search_in_qdrant(client, codigo, query_embedding, k=8)
-        chunksBD = search_in_qdrant(client, bd, query_embedding768, k=8)
-        chunksArchivo = search_in_qdrant(client, archivo, query_embedding768, k=5)
+        chunksCodigo = search_in_qdrant(client, codigo, user_query, query_embedding, proyecto, k=8 )
+        chunksBD = search_in_qdrant(client, bd,  user_query, query_embedding768, proyecto , k=10)
+        chunksArchivo = search_in_qdrant(client, archivo,  user_query, query_embedding768, proyecto, k=5)
 
         memory = getProjectMemory(
             client=client,

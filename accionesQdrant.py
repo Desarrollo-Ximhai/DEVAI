@@ -4,7 +4,7 @@ from qdrant_client import QdrantClient
 from qdrant_client.http.models import Filter, FieldCondition, MatchValue
 from qdrant_client.http.models import Filter, FieldCondition, MatchValue, PointStruct
 from datetime import datetime
-
+from fastembed.sparse import SparseTextEmbedding
 
 def conectarQdrant(qdrant_url, qdrant_api_key):
     try:
@@ -51,14 +51,48 @@ def borrar_por_point_id(client: QdrantClient, collection_name: str, point_id: st
     )
     return resultado
 
-def search_in_qdrant(client, collection_name, query_embedding, k=5):
+#Busqueda anterior, solo era sobre los vectores, ahora lo hacemos tambien de manera dispersa(palabras clave)
+# def search_in_qdrant(client, collection_name, query_embedding, k=5):
+#     results = client.query_points(
+#         collection_name=collection_name,
+#         query=query_embedding,
+#         limit=k,
+#         )
+
+#     return results.points 
+
+def search_in_qdrant(client, collection_name, user_query, query_embedding, proyecto, k=10):
+    filtros = []
+    if proyecto:
+        filtros.append(
+            FieldCondition(
+                key="project",
+                match=MatchValue(value=proyecto)
+            )
+        )
+        
+    sparse_emb = list(sparse_model.embed(user_query))[0]
+    qdrant_sparse_vector = rest_models.SparseVector(
+        indices=sparse_emb.indices.tolist(),
+        values=sparse_emb.values.tolist()
+    )
     results = client.query_points(
         collection_name=collection_name,
-        query=query_embedding,
+        prefetch=[
+            # Sub-petición 1: Búsqueda Semántica (Densa)
+            rest_models.Prefetch(query=query_embedding, limit=k),
+            # Sub-petición 2: Búsqueda por Palabras Clave (Dispersa)
+            rest_models.Prefetch(query=qdrant_sparse_vector, using="text-sparse", limit=k)
+        ],
+        # El motor fusiona ambos rankings automáticamente usando RRF
+        query=rest_models.FusionQuery(fusion=rest_models.Fusion.RRF),
         limit=k,
+        query_filter=Filter(
+            must=filtros
         )
-
-    return results.points 
+    )
+    
+    return results.points
 
 def save_to_qdrant(client, embed_fn, user_query, collection_memory, respuesta, chat_id, proyecto="default"):
     

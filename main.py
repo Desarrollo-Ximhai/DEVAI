@@ -251,7 +251,7 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
         collection_memory = memoria
         chunksCodigo = search_in_qdrant(client, codigo, user_query, query_embedding, None, k=8 )
         chunksBD = search_in_qdrant(client, bd,  user_query, query_embedding768, proyecto , k=10)
-        chunksArchivo = search_in_qdrant(client, archivo,  user_query, query_embedding768, proyecto, k=5)
+        chunksArchivo = search_in_qdrant(client, archivo,  user_query, query_embedding768, None, k=5)
 
         memory = getProjectMemory(
             client=client,

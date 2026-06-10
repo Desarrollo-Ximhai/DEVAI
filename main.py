@@ -36,6 +36,10 @@ tokens_salida_acumulados =0
 conectarGemini(GOOGLE_API_KEY)
 client = conectarQdrant(QDRANT_URL, QDRANT_API_KEY)
 
+def debug(debug):
+    showLogs = True
+    if(showLogs):
+        print(debug)
 
 def optimizar_y_aplanar_historial(historial: Any, max_tokens: int):
     """
@@ -46,10 +50,10 @@ def optimizar_y_aplanar_historial(historial: Any, max_tokens: int):
         try:
             historial = json.loads(historial)
         except Exception:
-            return [], 0 
+            return []
             
     if not isinstance(historial, list):
-        return [], 0
+        return []
 
     encoding = tiktoken.get_encoding("cl100k_base")
     historial_plano_final = []
@@ -215,6 +219,7 @@ def decontextualize_query(historial_plano, nueva_pregunta, model_name="models/ge
     response = generate_response(prompt_reformador, model_name)
     tokens_entrada_acumulados += response["tokens_entrada"]
     tokens_salida_acumulados += response["tokens_salida"]
+    debug(f"Query de descontextualizacion, TokIn+: {tokens_entrada_acumulados}, TokOut+: {tokens_salida_acumulados} Entro: {nueva_pregunta}, salió: {response["texto"].strip() }")
     return response["texto"].strip()
 
 def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyecto: str = "default", model_name= "models/gemini-3-flash-preview", historial = '', max_tokens = 6000, archivos = None  ):
@@ -239,8 +244,8 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
             return {'error': 'Failed to generate embedding for query'}, 500
 
         query_embedding768 = embed_with_gemini(user_query,768)
-        if query_embedding is None:
-            return {'error': 'Failed to generate embedding for query'}, 500
+        if query_embedding768 is None:
+            return {'error': 'Failed to generate embedding 768 for query'}, 500
 
         collection_memory = memoria
         chunksCodigo = search_in_qdrant(client, codigo, query_embedding, k=8)
@@ -264,6 +269,7 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
         tokens_entrada_acumulados += response["tokens_entrada"]
         tokens_salida_acumulados += response["tokens_salida"]
         response_text = response["texto"].strip()
+        debug(f"Query de rag, TokIn+: {tokens_entrada_acumulados}, TokOut+: {tokens_salida_acumulados}")
 
         uuids = save_to_qdrant(
             client=client,
@@ -311,13 +317,12 @@ def enrutar_consulta(user_query: str, historial: str = "", modelo = 'models/gemi
         response = response["texto"].strip()
 
         decision = response.upper()
-        
+        debug(f"Query de enrutamiento, TokIn+: {tokens_entrada_acumulados}, TokOut+: {tokens_salida_acumulados}. Ruta: {decision}")
         # Sanitizamos la respuesta por si el LLM añade puntos o espacios
-        if "RAG" in decision:
-            return "RAG"
-        return "FREE"
+        if "FREE" in decision:
+            return "FREE"
+        return "RAG"
     except Exception as e:
-        print(f"⚠️ Error en el router, desviando a RAG por seguridad: {e}")
         return "RAG" # Por seguridad, si falla el router, usamos el RAG
 
 

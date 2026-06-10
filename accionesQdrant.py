@@ -72,7 +72,7 @@ def search_in_qdrant(client, collection_name, user_query, query_embedding, proye
         )
     sparse_model = SparseTextEmbedding(model_name="Qdrant/bm25")
     sparse_emb = list(sparse_model.embed(user_query))[0]
-    qdrant_sparse_vector = rest_models.SparseVector(
+    qdrant_sparse_vector = SparseVector(
         indices=sparse_emb.indices.tolist(),
         values=sparse_emb.values.tolist()
     )
@@ -80,12 +80,12 @@ def search_in_qdrant(client, collection_name, user_query, query_embedding, proye
         collection_name=collection_name,
         prefetch=[
             # Sub-petición 1: Búsqueda Semántica (Densa)
-            rest_models.Prefetch(query=query_embedding, limit=k),
+            Prefetch(query=query_embedding, limit=k),
             # Sub-petición 2: Búsqueda por Palabras Clave (Dispersa)
-            rest_models.Prefetch(query=qdrant_sparse_vector, using="text-sparse", limit=k)
+            Prefetch(query=qdrant_sparse_vector, using="text-sparse", limit=k)
         ],
         # El motor fusiona ambos rankings automáticamente usando RRF
-        query=rest_models.FusionQuery(fusion=rest_models.Fusion.RRF),
+        query=FusionQuery(fusion=Fusion.RRF),
         limit=k,
         query_filter=Filter(
             must=filtros

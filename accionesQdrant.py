@@ -1,8 +1,7 @@
 # accionesQdrant.py
 import uuid
 from qdrant_client import QdrantClient
-from qdrant_client.http.models import Filter, FieldCondition, MatchValue
-from qdrant_client.http.models import Filter, FieldCondition, MatchValue, PointStruct
+from qdrant_client.http import models 
 from datetime import datetime
 from fastembed.sparse import SparseTextEmbedding
 

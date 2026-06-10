@@ -219,7 +219,8 @@ def decontextualize_query(historial_plano, nueva_pregunta, model_name="models/ge
     response = generate_response(prompt_reformador, model_name)
     tokens_entrada_acumulados += response["tokens_entrada"]
     tokens_salida_acumulados += response["tokens_salida"]
-    debug(f"Query de descontextualizacion, TokIn+: {tokens_entrada_acumulados}, TokOut+: {tokens_salida_acumulados} Entro: {nueva_pregunta}, salió: {response["texto"].strip() }")
+    texto = response["texto"].strip()
+    debug(f"Query de descontextualizacion, TokIn+: {tokens_entrada_acumulados}, TokOut+: {tokens_salida_acumulados} Entro: {nueva_pregunta}, salió: {texto} ")
     return response["texto"].strip()
 
 def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyecto: str = "default", model_name= "models/gemini-3-flash-preview", historial = '', max_tokens = 6000, archivos = None  ):

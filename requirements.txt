@@ -6,4 +6,3 @@ pydantic==2.8.2
 tiktoken==0.13.0
 python-multipart==0.0.30
 fastembed==0.8.0
-FlashRank

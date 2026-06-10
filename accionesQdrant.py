@@ -1,14 +1,14 @@
 # accionesQdrant.py
 import uuid
+import os
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Filter, FieldCondition, MatchValue, PointStruct, SparseVector, Prefetch, Fusion, FusionQuery
 from qdrant_client.http import models 
 from datetime import datetime
 from fastembed.sparse import SparseTextEmbedding
-from flashrank import Ranker, RerankRequest
 from funciones import debug
 sparse_model = SparseTextEmbedding(model_name="Qdrant/bm25")
-ranker = Ranker(model_name="ms-marco-MiniLM-L-12-v2")
+import requests
 
 
 
@@ -57,6 +57,61 @@ def borrar_por_point_id(client: QdrantClient, collection_name: str, point_id: st
     )
     return resultado
 
+
+def rerank_con_langsearch(query_usuario, candidatos, top_n=4):
+    """
+    Usa la API de LangSearch para reordenar los chunks de Qdrant.
+    Consumo de RAM local = 0 MB.
+    """
+    RERANK_KEY= os.environ.get('RERANK_KEY') 
+    RERANK_URL= os.environ.get('RERANK_URL') 
+
+    if not candidatos:
+        return []
+
+    url = f"{RERANK_URL}"
+    headers = {
+        "Authorization": f"Bearer {RERANK_KEY}", 
+        "Content-Type": "application/json"
+    }
+
+    # Extraemos solo las cadenas de texto limpias de los candidatos de Qdrant
+    documentos = [
+        c.payload.get("text", "") if hasattr(c, "payload") else c.get("text", "")
+        for c in candidatos
+    ]
+
+    payload = {
+        "model": "langsearch-reranker-v1",
+        "query": query_usuario,
+        "top_n": top_n,
+        "return_documents": False, # No necesitamos que nos devuelva el texto, solo los índices
+        "documents": documentos
+    }
+
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=5)
+        if response.status_code == 200:
+            res_data = response.json()
+            
+            # Re-mapeamos los índices ganadores a tus objetos originales de Qdrant
+            chunks_finales = []
+            for hit in res_data.get("results", []):
+                idx = hit.get("index")
+                if idx is not None and idx < len(candidatos):
+                    chunks_finales.append(candidatos[idx])
+            
+            return chunks_finales
+        else:
+            print(f"⚠️ LangSearch respondió con error {response.status_code}, usando fallback.")
+            return candidatos[:top_n]
+            
+    except Exception as e:
+        print(f"⚠️ Falló la conexión con LangSearch: {e}")
+        # Tu RAG no se muere si se cae la API, solo usa los primeros por defecto
+        return candidatos[:top_n]
+
+
 #Busqueda anterior, solo era sobre los vectores, ahora lo hacemos tambien de manera dispersa(palabras clave)
 # def search_in_qdrant(client, collection_name, query_embedding, k=5):
 #     results = client.query_points(
@@ -67,9 +122,10 @@ def borrar_por_point_id(client: QdrantClient, collection_name: str, point_id: st
 
 #     return results.points 
 
+
+
 def search_in_qdrant(client, collection_name, user_query, query_embedding, proyecto, k):
     global sparse_model
-    global ranker
     filtros = []
     if proyecto:
         filtros.append(
@@ -102,21 +158,7 @@ def search_in_qdrant(client, collection_name, user_query, query_embedding, proye
     debug(f"Busqueda en qdrant con k:{k}" )
 
     #Reranking
-    
-    passages = [
-        {
-            "id": i,
-            "text": chunk.payload["text"],
-            "meta": chunk.payload  
-        }
-        for i, chunk in enumerate(results.points) if chunk.payload
-    ]
-
-    rerank_request = RerankRequest(query=user_query, passages=passages)
-    results = ranker.rerank(rerank_request)
-    nuevosPuntos = results[:5]
-    
-    return nuevosPuntos
+    return rerank_con_langsearch(user_query, results.points, 5) 
 
 def save_to_qdrant(client, embed_fn, user_query, collection_memory, respuesta, chat_id, proyecto="default"):
     

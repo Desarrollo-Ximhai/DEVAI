@@ -8,7 +8,7 @@ from fastembed.sparse import SparseTextEmbedding
 from flashrank import Ranker, RerankRequest
 from funciones import debug
 sparse_model = SparseTextEmbedding(model_name="Qdrant/bm25")
-ranker = Ranker(model_name="ms-marco-MiniLM-L-6-v2")
+ranker = Ranker(model_name="ms-marco-MiniLM-L-12-v2")
 
 
 

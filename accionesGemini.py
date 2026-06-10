@@ -16,11 +16,12 @@ def embedForCode(text):
     )
     return res["embedding"] if "embedding" in res else None
 
-def embed_with_gemini(text, dimension=3072):
+def embed_with_gemini(text, dimension=3072, tipo="retrieval_document"):
     res = genai.embed_content(
         model='models/gemini-embedding-001',
         content=text,
-        task_type="retrieval_query",
+        task_type=tipo,
+        #task_type="retrieval_query",
         #task_type="retrieval_document",
         output_dimensionality=dimension
     )

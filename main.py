@@ -243,11 +243,11 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
         user_queryAux = user_query
         user_query = query_para_busqueda
 
-        query_embedding = embed_with_gemini(user_query)
+        query_embedding = embed_with_gemini(user_query, tipo= "retrieval_query" )
         if query_embedding is None:
             return {'error': 'Failed to generate embedding for query'}, 500
 
-        query_embedding768 = embed_with_gemini(user_query,768)
+        query_embedding768 = embed_with_gemini(user_query,768, tipo= "retrieval_query")
         if query_embedding768 is None:
             return {'error': 'Failed to generate embedding 768 for query'}, 500
 

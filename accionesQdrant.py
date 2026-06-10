@@ -8,6 +8,9 @@ from fastembed.sparse import SparseTextEmbedding
 from flashrank import Ranker, RerankRequest
 from main import debug
 
+sparse_model = SparseTextEmbedding(model_name="Qdrant/bm25")
+ranker = Ranker(model_name="ms-marco-MiniLM-L-6-v2")
+
 def conectarQdrant(qdrant_url, qdrant_api_key):
     try:
         qdrant_api_key = qdrant_api_key
@@ -63,7 +66,9 @@ def borrar_por_point_id(client: QdrantClient, collection_name: str, point_id: st
 
 #     return results.points 
 
-def search_in_qdrant(client, collection_name, user_query, query_embedding, proyecto, k=10):
+def search_in_qdrant(client, collection_name, user_query, query_embedding, proyecto, k):
+    global sparse_model
+    global ranker
     filtros = []
     if proyecto:
         filtros.append(
@@ -72,7 +77,7 @@ def search_in_qdrant(client, collection_name, user_query, query_embedding, proye
                 match=MatchValue(value=proyecto)
             )
         )
-    sparse_model = SparseTextEmbedding(model_name="Qdrant/bm25")
+    
     sparse_emb = list(sparse_model.embed(user_query))[0]
     qdrant_sparse_vector = SparseVector(
         indices=sparse_emb.indices.tolist(),
@@ -96,19 +101,19 @@ def search_in_qdrant(client, collection_name, user_query, query_embedding, proye
     debug(f"Busqueda en qdrant con k:{k}" )
 
     #Reranking
-    ranker = Ranker(model_name="ms-marco-MiniLM-L-6-v2")
+    
     passages = [
         {
             "id": i,
             "text": chunk.payload["text"],
             "meta": chunk.payload  
         }
-        for i, chunk in enumerate(result.points) if chunk.payload
+        for i, chunk in enumerate(results.points) if chunk.payload
     ]
 
-    rerank_request = RerankRequest(query=query_para_busqueda, passages=passages)
+    rerank_request = RerankRequest(query=user_query, passages=passages)
     results = ranker.rerank(rerank_request)
-    nuevosPuntos = results[:4]
+    nuevosPuntos = results[:5]
     
     return nuevosPuntos
 

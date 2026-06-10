@@ -70,7 +70,7 @@ def search_in_qdrant(client, collection_name, user_query, query_embedding, proye
                 match=MatchValue(value=proyecto)
             )
         )
-        
+    sparse_model = SparseTextEmbedding(model_name="Qdrant/bm25")
     sparse_emb = list(sparse_model.embed(user_query))[0]
     qdrant_sparse_vector = rest_models.SparseVector(
         indices=sparse_emb.indices.tolist(),

@@ -14,7 +14,7 @@ from typing import Optional
 import json
 
 #para el borrado de puntos
-from accionesQdrant import conectarQdrant, borrar_por_chat_id, borrar_por_point_id, search_in_qdrant, save_to_qdrant, getProjectMemory
+from accionesQdrant import conectarQdrant, borrar_por_chat_id, borrar_por_point_id, search_in_qdrant, save_to_qdrant, getProjectMemory, embebirBaseDatos
 from accionesGemini import conectarGemini, generate_response, embed_with_gemini
 
 #para la autenticacion de la API
@@ -507,3 +507,31 @@ def endpoint_borrar_punto(request: BorrarPuntoRequest):
         return {"status": "error", "message": str(e)}
 
 
+
+#
+# =================================================================
+# NUEVO APARTADO: Para poner una nueva base de datos
+# =================================================================
+
+@app.post("/nueva-bd", dependencies=[Depends(verificar_clave)])
+async def devai_endpoint(request: Request):
+    form_data = await request.form()
+    
+    descripcion = form_data.get("descripcion", "")
+    proyecto = form_data.get("proyecto", "")
+    model_name = form_data.get("model_name", "models/gemini-3.1-flash-lite")
+
+    archivos_procesados = []
+    for key, value in form_data.items():
+        if key.startswith("files[") and hasattr(value, "filename"):
+            contenido_bytes = await value.read()
+            archivos_procesados.append({
+                "mime_type": value.content_type,   
+                "data": contenido_bytes,
+                "filename": value.filename
+            })
+    archivo = archivos_procesados[0]
+    respuesta =  embebirBaseDatos(descripcion, archivo, proyecto)
+	#print('respuesta')
+	#print(respuesta)
+    return {"response": respuesta}

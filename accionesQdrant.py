@@ -276,7 +276,7 @@ def embebirBaseDatos(descripcion, archivo, proyecto):
     """
 
     
-    respuesta = generate_response(prompt):
+    respuesta = generate_response(prompt)
     diccionario_descripciones = json.loads(respuesta_api)
 
     for chunk in chunks_base:

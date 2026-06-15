@@ -255,7 +255,7 @@ def embebirBaseDatos(descripcion, archivo, proyecto):
     # 1. Ejecutamos tu función de chunking pasando el string directo
     chunks_base = chunk_schema(
         sql_content=sql_string, 
-        relative_path=value.filename, 
+        relative_path=archivo["filename"], 
         project=proyecto
     )
     print('chunks_base')

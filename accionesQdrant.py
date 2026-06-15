@@ -246,7 +246,7 @@ def getProjectMemory(client, embed_fn, user_query, collection_memory, chat_id, p
     
     return puntos
 
-def embebirBaseDatos(descripcion, archivos, proyecto):
+def embebirBaseDatos(descripcion, archivo, proyecto):
     archivos_procesados = []
     chunks_de_base_datos = [] 
     # Transformamos los bytes puros en un string de Python

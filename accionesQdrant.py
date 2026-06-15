@@ -246,38 +246,38 @@ def getProjectMemory(client, embed_fn, user_query, collection_memory, chat_id, p
     
     return puntos
 
-    def embebirBaseDatos(descripcion, archivos, proyecto):
-        archivos_procesados = []
-        chunks_de_base_datos = [] 
-        # Transformamos los bytes puros en un string de Python
-        sql_string =  archivo["data"].decode("utf-8", errors="ignore")
-        
-        # 1. Ejecutamos tu función de chunking pasando el string directo
-        chunks_base = chunk_schema(
-            sql_content=sql_string, 
-            relative_path=value.filename, 
-            project=proyecto
-        )
-        print('chunks_base')
-        print(chunks_base)
-        return chunks_base
-        
-        # # 2. El flujo con la IA: Iteramos tus chunks para enriquecerlos
-        # for chunk in chunks_base:
-        #     if chunk["metadata"]["type"] == "table":
-        #         tabla_nombre = chunk["metadata"]["table"]
-                
-        #         # Aquí llamas a la función que le pide la descripción a Gemini
-        #         # descripcion_ia = await pedir_descripcion_a_gemini(chunk["text"])
-        #         descripcion_ia = "Descripción generada por el LLM para esta tabla..." 
-                
-        #         # Fusionamos el Markdown de la IA con el SQL original (Formato Híbrido)
-        #         chunk["text"] = f"# TABLA: {tabla_nombre}\n{descripcion_ia}\n\n## SQL ORIGINAL:\n{chunk['text']}"
+def embebirBaseDatos(descripcion, archivos, proyecto):
+    archivos_procesados = []
+    chunks_de_base_datos = [] 
+    # Transformamos los bytes puros en un string de Python
+    sql_string =  archivo["data"].decode("utf-8", errors="ignore")
+    
+    # 1. Ejecutamos tu función de chunking pasando el string directo
+    chunks_base = chunk_schema(
+        sql_content=sql_string, 
+        relative_path=value.filename, 
+        project=proyecto
+    )
+    print('chunks_base')
+    print(chunks_base)
+    return chunks_base
+    
+    # # 2. El flujo con la IA: Iteramos tus chunks para enriquecerlos
+    # for chunk in chunks_base:
+    #     if chunk["metadata"]["type"] == "table":
+    #         tabla_nombre = chunk["metadata"]["table"]
             
-        #     # Guardamos el chunk ya procesado en nuestra lista
-        #     chunks_de_base_datos.append(chunk)
+    #         # Aquí llamas a la función que le pide la descripción a Gemini
+    #         # descripcion_ia = await pedir_descripcion_a_gemini(chunk["text"])
+    #         descripcion_ia = "Descripción generada por el LLM para esta tabla..." 
             
-        # print(f"🧬 Se procesó el archivo SQL '{value.filename}' en {len(chunks_de_base_datos)} chunks estructurados.")
+    #         # Fusionamos el Markdown de la IA con el SQL original (Formato Híbrido)
+    #         chunk["text"] = f"# TABLA: {tabla_nombre}\n{descripcion_ia}\n\n## SQL ORIGINAL:\n{chunk['text']}"
+        
+    #     # Guardamos el chunk ya procesado en nuestra lista
+    #     chunks_de_base_datos.append(chunk)
+        
+    # print(f"🧬 Se procesó el archivo SQL '{value.filename}' en {len(chunks_de_base_datos)} chunks estructurados.")
 
 def chunk_schema(sql, relative_path, project):
    

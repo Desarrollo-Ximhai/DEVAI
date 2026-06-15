@@ -290,14 +290,14 @@ def embebirBaseDatos(client, descripcion, archivo, proyecto):
 
     chunks_with_embeddings = []
     for chunk in chunks_de_base_datos:
-        embedding = embed_with_gemini(chunk["text"], 768, "retrieval_document"):
+        embedding = embed_with_gemini(chunk["text"], 768, "retrieval_document")
         chunk_with_embedding = {
             "text": chunk['text'],
             "metadata": chunk['metadata'],
             "embedding": embedding
         }
         chunks_with_embeddings.append(chunk_with_embedding);
-        
+
     collection_name = "DevAI-DB"
     try:
         client.delete(

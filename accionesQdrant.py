@@ -302,10 +302,16 @@ def embebirBaseDatos(client, descripcion, archivo, proyecto):
     try:
         client.delete(
             collection_name=collection_name,
-            selector=models.Filter(
-                must=[
+            points_selector=models.Filter(
+                should=[
+                    # Opción A: El proyecto está en la raíz del payload
                     models.FieldCondition(
-                        key="project", 
+                        key="project",
+                        match=models.MatchValue(value=proyecto)
+                    ),
+                    # Opción B: El proyecto está anidado dentro de metadata
+                    models.FieldCondition(
+                        key="metadata.project",
                         match=models.MatchValue(value=proyecto)
                     )
                 ]

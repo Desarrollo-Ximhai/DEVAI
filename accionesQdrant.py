@@ -287,10 +287,13 @@ def embebirBaseDatos(descripcion, archivo, proyecto):
             descripcion_ia = diccionario_descripciones.get(tabla_nombre, "")
             
             # Inyectamos el formato híbrido para Qdrant
-            chunk["text"] = f"# TABLA: {tabla_nombre}\n**Descripción Lógica:** {descripcion_ia}\n\n## SQL ORIGINAL:\n{chunk['text']}"
+            sql_original = chunk["text"]
+
+            chunk["text"] = f"# TABLA: {tabla_nombre}\n**Descripción Lógica:** {descripcion_ia}\n\n## SQL ORIGINAL:\n{sql_original}"            
+            chunk["metadata"]["description"] = descripcion_ia
             
         chunks_de_base_datos.append(chunk)
-        
+
     return [respuesta, chunks_de_base_datos]
 
 

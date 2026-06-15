@@ -10,6 +10,7 @@ from funciones import debug
 sparse_model = SparseTextEmbedding(model_name="Qdrant/bm25")
 import requests
 import re
+import json
 
 from accionesGemini import conectarGemini, generate_response, embed_with_gemini
 

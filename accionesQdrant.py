@@ -249,24 +249,20 @@ def getProjectMemory(client, embed_fn, user_query, collection_memory, chat_id, p
     
     return puntos
 
-def embebirBaseDatos(descripcion, archivo, proyecto):
+def embebirBaseDatos(client, descripcion, archivo, proyecto):
     GOOGLE_API_KEY= os.environ.get('KEY-FREE') 
     conectarGemini(GOOGLE_API_KEY)
 
 
     archivos_procesados = []
     chunks_de_base_datos = [] 
-    # Transformamos los bytes puros en un string de Python
     sql_string =  archivo["data"].decode("utf-8", errors="ignore")
-    
-    # 1. Ejecutamos tu función de chunking pasando el string directo
     chunks_base = chunk_schema(
         sql_string, 
         archivo["filename"], 
         proyecto
     )
-    # print('chunks_base')
-    # print(chunks_base)
+  
     prompt = f"""
     Analiza este esquema SQL completo y entiende la lógica de negocio del sistema.
     Devuelve un objeto JSON estrictamente formateado donde las llaves sean los nombres de las tablas 
@@ -285,8 +281,6 @@ def embebirBaseDatos(descripcion, archivo, proyecto):
             tabla_nombre = chunk["metadata"]["table"]
             
             descripcion_ia = diccionario_descripciones.get(tabla_nombre, "")
-            
-            # Inyectamos el formato híbrido para Qdrant
             sql_original = chunk["text"]
 
             chunk["text"] = f"# TABLA: {tabla_nombre}\n**Descripción Lógica:** {descripcion_ia}\n\n## SQL ORIGINAL:\n{sql_original}"            
@@ -294,26 +288,79 @@ def embebirBaseDatos(descripcion, archivo, proyecto):
             
         chunks_de_base_datos.append(chunk)
 
-    return [respuesta, chunks_de_base_datos]
+    chunks_with_embeddings = []
+    for chunk in chunks_de_base_datos:
+        embedding = embed_with_gemini(chunk["text"], 768, "retrieval_document"):
+        chunk_with_embedding = {
+            "text": chunk['text'],
+            "metadata": chunk['metadata'],
+            "embedding": embedding
+        }
+        chunks_with_embeddings.append(chunk_with_embedding);
+        
+    collection_name = "DevAI-DB"
+    try:
+        client.delete(
+            collection_name=collection_name,
+            selector=models.Filter(
+                must=[
+                    models.FieldCondition(
+                        key="project", 
+                        match=models.MatchValue(value=proyecto)
+                    )
+                ]
+            )
+        )
+    except Exception as e:
+        print(f"[⚠️ ADVERTENCIA] No se pudo borrar o no existían puntos previos: {e}")
+
+    points = []
+    
+    for chunk_data in chunks_with_embeddings:
+        if chunk_data['embedding'] is not None:
+            
+            payload = {
+                "text": chunk_data['text'],
+                "metadata": chunk_data['metadata'],
+                "project": proyecto 
+            }
+
+            # Procesar Vector Disperso (BM25)
+            sparse_embeddings = list(sparse_model.embed([chunk_data['text']]))
+            sparse_emb = sparse_embeddings[0]
+            qdrant_sparse_vector = SparseVector(
+                indices=sparse_emb.indices.tolist(),
+                values=sparse_emb.values.tolist()
+            )
+
+            vector_hibrido = {
+                "": chunk_data['embedding'],           
+                "text-sparse": qdrant_sparse_vector   
+            }
+
+            punto_id = str(uuid.uuid4())
+
+            points.append(
+                PointStruct(
+                    id=punto_id,
+                    vector=vector_hibrido,
+                    payload=payload
+                )
+            )
+
+    try:
+        client.upsert(
+            collection_name=collection_name,
+            wait=True,
+            points=points
+        )
+        print(f"✅ Se han subido exitosamente {len(points)} chunks actualizados a la colección '{collection_name}'.")
+    except Exception as e:
+        print(f"[ERROR CRÍTICO] al subir los chunks a Qdrant: {e}")
 
 
-    # return respuesta
-    # # 2. El flujo con la IA: Iteramos tus chunks para enriquecerlos
-    # for chunk in chunks_base:
-    #     if chunk["metadata"]["type"] == "table":
-    #         tabla_nombre = chunk["metadata"]["table"]
-            
-    #         # Aquí llamas a la función que le pide la descripción a Gemini
-    #         # descripcion_ia = await pedir_descripcion_a_gemini(chunk["text"])
-    #         descripcion_ia = "Descripción generada por el LLM para esta tabla..." 
-            
-    #         # Fusionamos el Markdown de la IA con el SQL original (Formato Híbrido)
-    #         chunk["text"] = f"# TABLA: {tabla_nombre}\n{descripcion_ia}\n\n## SQL ORIGINAL:\n{chunk['text']}"
-        
-    #     # Guardamos el chunk ya procesado en nuestra lista
-    #     chunks_de_base_datos.append(chunk)
-        
-    # print(f"🧬 Se procesó el archivo SQL '{value.filename}' en {len(chunks_de_base_datos)} chunks estructurados.")
+    return True
+
 
 def chunk_schema(sql, relative_path, project):
    

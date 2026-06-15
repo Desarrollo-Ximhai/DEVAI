@@ -531,7 +531,7 @@ async def devai_endpoint(request: Request):
                 "filename": value.filename
             })
     archivo = archivos_procesados[0]
-    respuesta =  embebirBaseDatos(descripcion, archivo, proyecto)
+    respuesta =  embebirBaseDatos(client, descripcion, archivo, proyecto)
 	#print('respuesta')
 	#print(respuesta)
     return {"response": respuesta}

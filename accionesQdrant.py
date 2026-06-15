@@ -309,11 +309,7 @@ def embebirBaseDatos(client, descripcion, archivo, proyecto):
                         key="project",
                         match=models.MatchValue(value=proyecto)
                     ),
-                    # Opción B: El proyecto está anidado dentro de metadata
-                    models.FieldCondition(
-                        key="metadata.project",
-                        match=models.MatchValue(value=proyecto)
-                    )
+                   
                 ]
             )
         )

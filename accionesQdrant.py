@@ -290,8 +290,8 @@ def embebirBaseDatos(descripcion, archivo, proyecto):
             chunk["text"] = f"# TABLA: {tabla_nombre}\n**Descripción Lógica:** {descripcion_ia}\n\n## SQL ORIGINAL:\n{chunk['text']}"
             
         chunks_de_base_datos.append(chunk)
-
-     return [chunks_de_base_datos]
+        
+    return [respuesta, chunks_de_base_datos]
 
 
     # return respuesta

@@ -11,6 +11,8 @@ sparse_model = SparseTextEmbedding(model_name="Qdrant/bm25")
 import requests
 import re
 
+from accionesGemini import conectarGemini, generate_response, embed_with_gemini
+
 
 
 def conectarQdrant(qdrant_url, qdrant_api_key):
@@ -247,6 +249,10 @@ def getProjectMemory(client, embed_fn, user_query, collection_memory, chat_id, p
     return puntos
 
 def embebirBaseDatos(descripcion, archivo, proyecto):
+    GOOGLE_API_KEY= os.environ.get('KEY-FREE') 
+    conectarGemini(GOOGLE_API_KEY)
+
+
     archivos_procesados = []
     chunks_de_base_datos = [] 
     # Transformamos los bytes puros en un string de Python
@@ -258,10 +264,36 @@ def embebirBaseDatos(descripcion, archivo, proyecto):
         archivo["filename"], 
         proyecto
     )
-    print('chunks_base')
-    print(chunks_base)
-    return chunks_base
+    # print('chunks_base')
+    # print(chunks_base)
+    prompt = f"""
+    Analiza este esquema SQL completo y entiende la lógica de negocio del sistema.
+    Devuelve un objeto JSON estrictamente formateado donde las llaves sean los nombres de las tablas 
+    y los valores sean las descripciones semánticas en español (qué hace la tabla y reglas de negocio deducidas).
+
+    SQL COMPLETO:
+    {sql_string}
+    """
+
     
+    respuesta = generate_response(prompt):
+    diccionario_descripciones = json.loads(respuesta_api)
+
+    for chunk in chunks_base:
+    if chunk["metadata"]["type"] == "table":
+        tabla_nombre = chunk["metadata"]["table"]
+        
+        descripcion_ia = diccionario_descripciones.get(tabla_nombre, "")
+        
+        # Inyectamos el formato híbrido para Qdrant
+        chunk["text"] = f"# TABLA: {tabla_nombre}\n**Descripción Lógica:** {descripcion_ia}\n\n## SQL ORIGINAL:\n{chunk['text']}"
+        
+    chunks_de_base_datos.append(chunk)
+
+    return [respuesta, chunks_de_base_datos]
+
+
+    return respuesta
     # # 2. El flujo con la IA: Iteramos tus chunks para enriquecerlos
     # for chunk in chunks_base:
     #     if chunk["metadata"]["type"] == "table":

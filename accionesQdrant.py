@@ -293,7 +293,7 @@ def embebirBaseDatos(descripcion, archivo, proyecto):
     return [respuesta, chunks_de_base_datos]
 
 
-    return respuesta
+    # return respuesta
     # # 2. El flujo con la IA: Iteramos tus chunks para enriquecerlos
     # for chunk in chunks_base:
     #     if chunk["metadata"]["type"] == "table":

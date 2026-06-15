@@ -278,7 +278,7 @@ def embebirBaseDatos(descripcion, archivo, proyecto):
 
     
     respuesta = generate_response(prompt)
-    diccionario_descripciones = json.loads(respuesta["texto"])
+    #diccionario_descripciones = json.loads(respuesta["texto"])
     return respuesta
     # for chunk in chunks_base:
     #     if chunk["metadata"]["type"] == "table":

@@ -62,7 +62,7 @@ def borrar_por_point_id(client: QdrantClient, collection_name: str, point_id: st
     return resultado
 
 
-def rerank_con_langsearch(query_usuario, candidatos, top_n=4):
+def rerank_con_langsearch(query_usuario, candidatos, top_n=8):
     """
     Usa la API de LangSearch para reordenar los chunks de Qdrant.
     Consumo de RAM local = 0 MB.

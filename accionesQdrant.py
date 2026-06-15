@@ -277,21 +277,21 @@ def embebirBaseDatos(descripcion, archivo, proyecto):
     """
 
     
-    respuesta = generate_response(prompt)
-    #diccionario_descripciones = json.loads(respuesta["texto"])
-    return respuesta
-    # for chunk in chunks_base:
-    #     if chunk["metadata"]["type"] == "table":
-    #         tabla_nombre = chunk["metadata"]["table"]
+    respuesta = generate_response(prompt,configuracion={"tipo": "application/json"})
+    diccionario_descripciones = json.loads(respuesta["texto"])
+    #return respuesta
+    for chunk in chunks_base:
+        if chunk["metadata"]["type"] == "table":
+            tabla_nombre = chunk["metadata"]["table"]
             
-    #         descripcion_ia = diccionario_descripciones.get(tabla_nombre, "")
+            descripcion_ia = diccionario_descripciones.get(tabla_nombre, "")
             
-    #         # Inyectamos el formato híbrido para Qdrant
-    #         chunk["text"] = f"# TABLA: {tabla_nombre}\n**Descripción Lógica:** {descripcion_ia}\n\n## SQL ORIGINAL:\n{chunk['text']}"
+            # Inyectamos el formato híbrido para Qdrant
+            chunk["text"] = f"# TABLA: {tabla_nombre}\n**Descripción Lógica:** {descripcion_ia}\n\n## SQL ORIGINAL:\n{chunk['text']}"
             
-    #     chunks_de_base_datos.append(chunk)
+        chunks_de_base_datos.append(chunk)
 
-    # return [respuesta, chunks_de_base_datos]
+     return [respuesta, chunks_de_base_datos]
 
 
     # return respuesta

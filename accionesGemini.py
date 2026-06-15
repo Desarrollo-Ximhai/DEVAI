@@ -44,9 +44,17 @@ def embed_with_gemini(text, dimension=3072, tipo="retrieval_document"):
 #     tokens = chat_model.count_tokens(payload_total_tokens)
 #     return response.text
 
-def generate_response(prompt, model_name="models/gemini-3.1-flash-lite", archivos: list = None):
+def generate_response(prompt, model_name="models/gemini-3.1-flash-lite", archivos: list = None, configuracion = None):
     print('modelo en generate:', model_name)
     
+    gen_config = {}
+
+    if configuracion:
+        if 'tipo' in configuracion:
+            gen_config['response_mime_type'] = configuracion['tipo']
+        
+        gen_config['temperature'] = configuracion.get('temperature', 0.2)
+
     chat_model = genai.GenerativeModel(model_name)
     contenidos_payload = [prompt]
     
@@ -56,7 +64,10 @@ def generate_response(prompt, model_name="models/gemini-3.1-flash-lite", archivo
                 "mime_type": arc["mime_type"],
                 "data": arc["data"]
             })
-    response = chat_model.generate_content(contenidos_payload)
+    response = chat_model.generate_content(
+        contenidos_payload,
+        generation_config=gen_config if gen_config else None
+        )
     
     uso_tokens = response.usage_metadata
     tokens_entrada = uso_tokens.prompt_token_count

@@ -291,7 +291,7 @@ def embebirBaseDatos(descripcion, archivo, proyecto):
             
         chunks_de_base_datos.append(chunk)
 
-     return [respuesta, chunks_de_base_datos]
+     return [chunks_de_base_datos]
 
 
     # return respuesta

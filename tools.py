@@ -72,7 +72,7 @@ class AgenteTools:
         try:
             # Añadimos un timeout estricto para que el agente no se quede colgado si PHP tarda
             #response = requests.post(self.PHP_API_URL, json=payload, headers=headers, timeout=15)
-            response = requests.post('https://devai.ximhai.com/pruebaApi.php', json=payload, headers=headers, timeout=15)
+            response = requests.post('https://ebano.ximhai.com/pruebaApi.php', json=payload, headers=headers, timeout=15)
             
             # Si PHP responde con códigos HTTP de error (500, 400, etc.)
             if response.status_code != 200:

@@ -410,13 +410,9 @@ async def devai_endpoint(request: Request):
 
 @app.post("/devaiAgent", dependencies=[Depends(verificar_clave)])
 async def devai_endpoint(request: Request):
-    global tokens_entrada_acumulados
-    global tokens_salida_acumulados
     global client
-    # 1. Extraemos todo el contenido del formulario multipart
     form_data = await request.form()
     
-    # 2. Extraemos los campos de texto con los mismos valores por defecto que tenías
     query = form_data.get("query", "")
     memoria = form_data.get("memoria", "DevAI-Memory")
     chat_id = int(form_data.get("chat_id", 0))

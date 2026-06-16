@@ -371,6 +371,8 @@ async def devai_endpoint(request: Request):
 @app.post("/devaiAgent", dependencies=[Depends(verificar_clave)])
 async def devai_endpoint(request: Request):
     global client
+    global tokens_entrada_acumulados
+    global tokens_salida_acumulados
     form_data = await request.form()
     
     query = form_data.get("query", "")

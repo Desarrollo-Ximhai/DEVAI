@@ -44,7 +44,7 @@ def embed_with_gemini(text, dimension=3072, tipo="retrieval_document"):
 #     tokens = chat_model.count_tokens(payload_total_tokens)
 #     return response.text
 
-def generate_response(prompt, model_name="models/gemini-3.1-flash-lite", archivos: list = None, configuracion = None):
+def generate_response(prompt, model_name="models/gemini-3.1-flash-lite", archivos: list = None, configuracion = None, tools: list = None):
     print('modelo en generate:', model_name)
     
     gen_config = {}
@@ -55,7 +55,7 @@ def generate_response(prompt, model_name="models/gemini-3.1-flash-lite", archivo
         
         gen_config['temperature'] = configuracion.get('temperature', 0.2)
 
-    chat_model = genai.GenerativeModel(model_name)
+    chat_model = genai.GenerativeModel(model_name=model_name, tools=tools)
     contenidos_payload = [prompt]
     
     if archivos:
@@ -64,10 +64,50 @@ def generate_response(prompt, model_name="models/gemini-3.1-flash-lite", archivo
                 "mime_type": arc["mime_type"],
                 "data": arc["data"]
             })
-    response = chat_model.generate_content(
-        contenidos_payload,
-        generation_config=gen_config if gen_config else None
+
+    # 🤖 MODO AGENTE: Si hay herramientas, usamos 'start_chat' para ejecución automática
+    if tools:
+        print("🤖 [INFO] Modo Agente activado. Orquestando llamadas automáticas...")
+        chat = chat_model.start_chat(enable_automatic_function_calling=True)
+        response = chat.send_message(contenidos_payload, generation_config=gen_config if gen_config else None)
+        
+        # 🔍 IMPRIMIR EL RAZONAMIENTO Y PASOS INTERMEDIOS DEL LLM
+        print("\n🗺️  [TRAZA DE PASOS Y RAZONAMIENTO DEL AGENTE]")
+        print("──────────────────────────────────────────────────")
+        for mensaje in chat.history:
+            for part in mensaje.parts:
+                
+                # Pasó 1: ¿El LLM decidió que necesitaba usar una herramienta?
+                if part.function_call:
+                    print(f"🧠 [LLM PENSÓ]: Necesito extraer datos del sistema.")
+                    print(f"   ↳ 🛠️  Llamando a: '{part.function_call.name}'")
+                    # Convertimos los argumentos de formato Google a un dict normal de Python
+                    args = dict(part.function_call.args)
+                    print(f"   ↳ 📋 Argumentos calculados: {args}\n")
+                
+                # Paso 2: ¿Es la respuesta que tu código de Python (Qdrant) le inyectó de vuelta?
+                elif part.function_response:
+                    print(f"⚙️  [PYTHON EJECUTÓ]: '{part.function_response.name}'")
+                    print(f"   ↳ 📥 Datos devueltos a Gemini con éxito.")
+                    print(f"   ↳ (Tu print interno de search_in_qdrant ya mostró los detalles)\n")
+                
+                # Paso 3: ¿Es texto plano? (El prompt inicial del usuario o la respuesta final de la IA)
+                elif part.text:
+                    rol = "USUARIO (Prompt)" if mensaje.role == "user" else "GEMINI (Respuesta Final)"
+                    print(f"💬 [{rol}]: {part.text.strip()}\n")
+        print("──────────────────────────────────────────────────\n")
+
+    # 📝 MODO NORMAL: Si no hay herramientas, se ejecuta el 'generate_content' clásico
+    else:
+        response = chat_model.generate_content(
+            contenidos_payload,
+            generation_config=gen_config if gen_config else None
         )
+
+    # response = chat_model.generate_content(
+    #     contenidos_payload,
+    #     generation_config=gen_config if gen_config else None
+    #     )
     
     uso_tokens = response.usage_metadata
     tokens_entrada = uso_tokens.prompt_token_count

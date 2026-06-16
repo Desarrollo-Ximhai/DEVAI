@@ -25,6 +25,8 @@ from fastapi import HTTPException, Header
 from typing import Any, Optional
 import tiktoken
 
+from tools import AgenteTools
+
 ADMIN_KEY = os.environ.get("ADMIN_API_KEY")
 def verificar_clave(api_key: str = Header(...)):
     if api_key != ADMIN_KEY:
@@ -452,24 +454,21 @@ async def devai_endpoint(request: Request):
     try:
         # 💥 AQUÍ OCURRE EL AISLAMIENTO PER-REQUEST:
         # Creamos una instancia única para esta petición de PHP en específico
-        herramientas_peticion = Qdrant(
+        objQdrant = Qdrant(
             client=client,
             collection_name=bd,
             proyecto=proyecto
         )
+        objTools = AgenteTools(objQdrant=objQdrant)
+        lista_tools = [objTools.buscar_conocimiento_base_datos]
+        respuesta = generate_response(
+            prompt=query,
+            model_name=model_name,
+            tools=lista_tools
+            )
         
-        # Configuramos Gemini pasándole el método amarrado a esta instancia
-        # Gemini solo verá que la función recibe "conceptos_a_buscar", ignorando el 'self'
-        model = genai.GenerativeModel(
-            model_name=model_name, 
-            tools=[herramientas_peticion.buscar_conocimiento_base_datos] # 💡 Enlace directo seguro
-        )
-        
-        # Iniciamos el chat agéntico
-        chat = model.start_chat(enable_automatic_function_calling=True)
-        respuesta = chat.send_message(query)
-        
-        return {"respuesta": respuesta.text}
+        return {"response": respuesta}
+
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

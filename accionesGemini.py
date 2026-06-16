@@ -44,7 +44,7 @@ def embed_with_gemini(text, dimension=3072, tipo="retrieval_document"):
 #     tokens = chat_model.count_tokens(payload_total_tokens)
 #     return response.text
 
-def generate_response(prompt, model_name="models/gemini-3.1-flash-lite", archivos: list = None, configuracion = None, tools: list = None, system_instruction=None):
+def generate_response(prompt, model_name="models/gemini-3.1-flash-lite", archivos: list = None, configuracion = None, tools: list = None, system_instruction=None, history:list = None):
     print('modelo en generate:', model_name)
     
     gen_config = {}
@@ -79,7 +79,7 @@ def generate_response(prompt, model_name="models/gemini-3.1-flash-lite", archivo
         
 
         chat_model = genai.GenerativeModel(model_name=model_name, tools=tools, system_instruction=system_instruction)
-        chat = chat_model.start_chat(enable_automatic_function_calling=True)
+        chat = chat_model.start_chat(history=history, enable_automatic_function_calling=True)
         response = chat.send_message(contenidos_payload, generation_config=gen_config if gen_config else None)
         
         # 🔍 IMPRIMIR EL RAZONAMIENTO Y PASOS INTERMEDIOS DEL LLM

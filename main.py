@@ -397,6 +397,16 @@ async def devai_endpoint(request: Request):
     historialModificado = optimizar_y_aplanar_historial(historial, max_tokens)
     query_para_busqueda = decontextualize_query(historialModificado, query)
     
+    historial_gemini = []
+    for turno in historialModificado:
+        # Gemini exige 'model' en lugar de 'assistant'
+        rol_gemini = "model" if turno["role"] == "assistant" else "user"
+        historial_gemini.append({
+            "role": rol_gemini,
+            "parts": [turno["content"]]  
+        })
+
+
     queryOriginal = query
     query = query_para_busqueda
 
@@ -430,8 +440,9 @@ async def devai_endpoint(request: Request):
     respuesta = generate_response(
         prompt=query_enriquecida,
         model_name=model_name,
-        tools=lista_tools
-        system_instruction=system_instruction
+        tools=lista_tools,
+        system_instruction=system_instruction,
+        history=historial_gemini
         )
     
     return respuesta["texto"]

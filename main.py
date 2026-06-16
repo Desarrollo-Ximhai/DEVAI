@@ -465,7 +465,7 @@ async def devai_endpoint(request: Request):
 
     uuids = objMemoria.save_to_qdrant(
         embed_fn=embed_with_gemini,
-        user_query=queryOriginal,
+        user_query=query,
         collection_memory=memoria,
         respuesta=response_text,
         chat_id=chat_id,

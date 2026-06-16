@@ -68,6 +68,14 @@ def generate_response(prompt, model_name="models/gemini-3.1-flash-lite", archivo
     # 🤖 MODO AGENTE: Si hay herramientas, usamos 'start_chat' para ejecución automática
     if tools:
         print("🤖 [INFO] Modo Agente activado. Orquestando llamadas automáticas...")
+
+        system_instruction = """
+        Eres DEVAI, un asistente experto en ingeniería de datos.
+        CRÍTICO: NO conoces la estructura, tablas, llaves ni columnas de la base de datos actual del usuario. Todo tu conocimiento interno sobre este proyecto es CERO.
+        Por lo tanto, ante CUALQUIER pregunta del usuario que involucre tablas, dueños, lotes, consultas o lógica de negocio, es OBLIGATORIO que uses primero la herramienta 'buscar_conocimiento_base_datos'.
+        Está estrictamente prohibido adivinar o inventar nombres de tablas sin haber consultado la herramienta antes.
+        """
+        chat_model = genai.GenerativeModel(model_name=model_name, tools=tools, system_instruction=system_instruction)
         chat = chat_model.start_chat(enable_automatic_function_calling=True)
         response = chat.send_message(contenidos_payload, generation_config=gen_config if gen_config else None)
         

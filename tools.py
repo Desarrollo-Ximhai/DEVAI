@@ -1,7 +1,7 @@
 
 from accionesGemini import conectarGemini, generate_response, embed_with_gemini
 from accionesQdrant import Qdrant, conectarQdrant
-
+import json
 import requests
 
 # =================================================================

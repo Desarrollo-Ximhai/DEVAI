@@ -397,7 +397,7 @@ async def devai_endpoint(request: Request):
 
 
     historialModificado = optimizar_y_aplanar_historial(historial, max_tokens)
-    query_para_busqueda = decontextualize_query(historialModificado, query)
+    #query_para_busqueda = decontextualize_query(historialModificado, query)
     
     historial_gemini = []
     for turno in historialModificado:
@@ -407,10 +407,6 @@ async def devai_endpoint(request: Request):
             "role": rol_gemini,
             "parts": [turno["content"]]  
         })
-
-
-    queryOriginal = query
-    query = query_para_busqueda
 
 
     system_instruction = """
@@ -441,11 +437,11 @@ async def devai_endpoint(request: Request):
         collection=memoria,
         proyecto=proyecto
     )
-    query_enriquecida = f"Consulta original del usuario: <QueryOriginal> {queryOriginal} </QueryOriginal>. Consulta enriquecida: <EnrichedQuery>{query_para_busqueda}</EnrichedQuery> "
+    #query_enriquecida = f"Consulta original del usuario: <QueryOriginal> {queryOriginal} </QueryOriginal>. Consulta enriquecida: <EnrichedQuery>{query_para_busqueda}</EnrichedQuery> "
     objTools = AgenteTools(objQdrant=objQdrant)
     lista_tools = [objTools.buscar_conocimiento_base_datos]
     response = generate_response(
-        prompt=query_enriquecida,
+        prompt=query,
         model_name=model_name,
         tools=lista_tools,
         system_instruction=system_instruction,
@@ -475,7 +471,8 @@ async def devai_endpoint(request: Request):
         chat_id=chat_id,
         proyecto=proyecto
     )
-    return {'response': response_text, 'uuids' : uuids, 'tokens_entrada' : tokens_entrada_acumulados, 'tokens_salida': tokens_salida_acumulados}, 200
+    respuesta = {'response': response_text, 'uuids' : uuids, 'tokens_entrada' : tokens_entrada_acumulados, 'tokens_salida': tokens_salida_acumulados}, 200
+    return {"response": respuesta}
 
 #
 # =================================================================

@@ -254,23 +254,23 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
         collection_memory = memoria
 
         objBD = Qdrant(
-            client=cliente,
+            client=client,
             collection=bd,
             proyecto=proyecto
         )
         objCodigo = Qdrant(
-            client=cliente,
+            client=client,
             collection=codigo,
             proyecto=proyecto
         )
         objArchivo = Qdrant(
-            client=cliente,
+            client=client,
             collection=archivo,
             proyecto=proyecto
         )
 
         objMemoria = Qdrant(
-            client=cliente,
+            client=client,
             collection=collection_memory,
             proyecto=proyecto
         )

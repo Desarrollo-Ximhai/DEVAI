@@ -1,4 +1,6 @@
 import google.generativeai as genai
+import json 
+
 from funciones import debug
 
 def conectarGemini(key):

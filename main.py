@@ -452,7 +452,7 @@ async def devai_endpoint(request: Request):
     # Creamos una instancia única para esta petición de PHP en específico
     objQdrant = Qdrant(
         client=client,
-        collection_name=bd,
+        collection=bd,
         proyecto=proyecto
     )
     objTools = AgenteTools(objQdrant=objQdrant)

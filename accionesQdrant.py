@@ -51,26 +51,32 @@ def rerank_con_langsearch( query_usuario, candidatos, top_n=10):
             "documents": documentos
         }
 
-        try:
-            response = requests.post(url, json=payload, headers=headers, timeout=5)
-            if response.status_code == 200:
-                res_data = response.json()
-                
-                # Re-mapeamos los índices ganadores a tus objetos originales de Qdrant
-                chunks_finales = []
-                for hit in res_data.get("results", []):
-                    idx = hit.get("index")
-                    if idx is not None and idx < len(candidatos):
-                        chunks_finales.append(candidatos[idx])
-                
-                return chunks_finales
-            else:
-                print(f"⚠️ LangSearch respondió con error {response.status_code}, usando fallback.")
-                return candidatos[:top_n]
-                
-        except Exception as e:
-            print(f"⚠️ Falló la conexión con LangSearch: {e}")
-            # Tu RAG no se muere si se cae la API, solo usa los primeros por defecto
+        
+        response = requests.post(url, json=payload, headers=headers, timeout=5)
+        if response.status_code == 200:
+            res_data = response.json()
+            
+            chunks_finales = []
+            for hit in res_data.get("results", []):
+                idx = hit.get("index")
+                if idx is not None and idx < len(candidatos):
+                    chunks_finales.append(candidatos[idx])
+            
+            return chunks_finales
+        
+        # 🔍 AQUÍ ESTÁ EL AJUSTE PARA INVESTIGAR EL ERROR 500
+        else:
+            print(f"⚠️ LangSearch respondió con error {response.status_code}, usando fallback.")
+            print("──────────────────────────────────────────────────")
+            print("🚨 [DETALLE DEL ERROR DE LANGSEARCH]:")
+            try:
+                # Intentamos leer si la API mandó un JSON con el mensaje de error
+                print(response.json())
+            except Exception:
+                # Si no es un JSON, imprimimos el HTML o texto plano crudo que mandó el servidor
+                print(response.text)
+            print("──────────────────────────────────────────────────")
+            
             return candidatos[:top_n]
 class Qdrant:
     def __init__(self, client, collection, proyecto):

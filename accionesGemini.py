@@ -84,23 +84,23 @@ def generate_response(prompt, model_name="models/gemini-3.1-flash-lite", archivo
         print("──────────────────────────────────────────────────")
         for mensaje in chat.history:
             for part in mensaje.parts:
-                
+                part_dict = type(part).to_dict(part) if hasattr(type(part), 'to_dict') else {}
                 # Pasó 1: ¿El LLM decidió que necesitaba usar una herramienta?
-                if part.function_call:
+                if 'function_call' in part_dict:
                     print(f"🧠 [LLM PENSÓ]: Necesito extraer datos del sistema.")
                     print(f"   ↳ 🛠️  Llamando a: '{part.function_call.name}'")
-                    # Convertimos los argumentos de formato Google a un dict normal de Python
                     args = dict(part.function_call.args)
                     print(f"   ↳ 📋 Argumentos calculados: {args}\n")
                 
                 # Paso 2: ¿Es la respuesta que tu código de Python (Qdrant) le inyectó de vuelta?
-                elif part.function_response:
-                    print(f"⚙️  [PYTHON EJECUTÓ]: '{part.function_response.name}'")
+                elif 'function_response' in part_dict:
+                    nombre_func = part_dict['function_response'].get('name', 'desconocida')
+                    print(f"⚙️  [PYTHON EJECUTÓ]: '{nombre_func}'")
                     print(f"   ↳ 📥 Datos devueltos a Gemini con éxito.")
-                    print(f"   ↳ (Tu print interno de search_in_qdrant ya mostró los detalles)\n")
+                    print(f"   ↳ (Tu Qdrant ya le entregó el contexto a la IA)\n")
                 
-                # Paso 3: ¿Es texto plano? (El prompt inicial del usuario o la respuesta final de la IA)
-                elif part.text:
+                # Paso 3: ¿Es texto plano? (Prompt inicial o respuesta final)
+                elif 'text' in part_dict:
                     rol = "USUARIO (Prompt)" if mensaje.role == "user" else "GEMINI (Respuesta Final)"
                     print(f"💬 [{rol}]: {part.text.strip()}\n")
         print("──────────────────────────────────────────────────\n")

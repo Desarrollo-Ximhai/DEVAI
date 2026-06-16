@@ -447,34 +447,33 @@ async def devai_endpoint(request: Request):
 
     # print('Entrando en respuesta RAG')
 
-    try:
-        # 💥 AQUÍ OCURRE EL AISLAMIENTO PER-REQUEST:
-        # Creamos una instancia única para esta petición de PHP en específico
-        objQdrant = Qdrant(
-            client=client,
-            collection_name=bd,
-            proyecto=proyecto
+   
+    # 💥 AQUÍ OCURRE EL AISLAMIENTO PER-REQUEST:
+    # Creamos una instancia única para esta petición de PHP en específico
+    objQdrant = Qdrant(
+        client=client,
+        collection_name=bd,
+        proyecto=proyecto
+    )
+    objTools = AgenteTools(objQdrant=objQdrant)
+    lista_tools = [objTools.buscar_conocimiento_base_datos]
+    respuesta = generate_response(
+        prompt=query,
+        model_name=model_name,
+        tools=lista_tools
         )
-        objTools = AgenteTools(objQdrant=objQdrant)
-        lista_tools = [objTools.buscar_conocimiento_base_datos]
-        respuesta = generate_response(
-            prompt=query,
-            model_name=model_name,
-            tools=lista_tools
-            )
-        
-        return {"response": respuesta}
+    
+    return {"response": respuesta}
 
         
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    
     
 
 
 
 	#print('respuesta')
 	#print(respuesta)
-    return {"response": respuesta}
+    #return {"response": respuesta}
 
 #
 # =================================================================

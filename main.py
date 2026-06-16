@@ -275,9 +275,9 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
             proyecto=proyecto
         )
 
-        chunksCodigo = objCodigo.search_in_qdrant( user_query, query_embedding, None, k=25 )
-        chunksBD = objBD.search_in_qdrant(user_query, query_embedding768, proyecto , k=40)
-        chunksArchivo = objArchivo.search_in_qdrant(user_query, query_embedding768, None, k=10)
+        chunksCodigo = objCodigo.search_in_qdrant( user_query, query_embedding, k=25 )
+        chunksBD = objBD.search_in_qdrant(user_query, query_embedding768 , k=40)
+        chunksArchivo = objArchivo.search_in_qdrant(user_query, query_embedding768, k=10)
 
         memory = objMemoria.getProjectMemory(
             embed_fn=embed_with_gemini,
@@ -410,6 +410,7 @@ async def devai_endpoint(request: Request):
 async def devai_endpoint(request: Request):
     global tokens_entrada_acumulados
     global tokens_salida_acumulados
+    global client
     # 1. Extraemos todo el contenido del formulario multipart
     form_data = await request.form()
     
@@ -435,31 +436,47 @@ async def devai_endpoint(request: Request):
             })
 
 
-    ruta = enrutar_consulta(query, historial)
-    print(f"🤖 [ROUTER SEMÁNTICO] Consulta: '{query}' -> Clasificada como: {ruta}")
+    # ruta = enrutar_consulta(query, historial)
+    # print(f"🤖 [ROUTER SEMÁNTICO] Consulta: '{query}' -> Clasificada como: {ruta}")
 
-    if ruta == "FREE":
-        print('Entrando en respuesta FREE')
-        response = generate_response(query, model_name)
-        tokens_entrada_acumulados += response["tokens_entrada"]
-        tokens_salida_acumulados += response["tokens_salida"]
-        response = response["texto"].strip()
-        return {'response': response}, 200
+    # if ruta == "FREE":
+    #     print('Entrando en respuesta FREE')
+    #     response = generate_response(query, model_name)
+    #     tokens_entrada_acumulados += response["tokens_entrada"]
+    #     tokens_salida_acumulados += response["tokens_salida"]
+    #     response = response["texto"].strip()
+    #     return {'response': response}, 200
 
-    print('Entrando en respuesta RAG')
-    respuesta = query_rag(
-		user_query=query,
-		memoria=memoria,
-		chat_id=chat_id,
-		codigo=codigo,
-		bd=bd,
-		archivo=archivo,
-		proyecto=proyecto,
-        model_name=model_name,
-        historial=historial,
-        max_tokens=max_tokens,
-        archivos=archivos_procesados
+    # print('Entrando en respuesta RAG')
+
+    try:
+        # 💥 AQUÍ OCURRE EL AISLAMIENTO PER-REQUEST:
+        # Creamos una instancia única para esta petición de PHP en específico
+        herramientas_peticion = Qdrant(
+            client=client,
+            collection_name=bd,
+            proyecto=proyecto
         )
+        
+        # Configuramos Gemini pasándole el método amarrado a esta instancia
+        # Gemini solo verá que la función recibe "conceptos_a_buscar", ignorando el 'self'
+        model = genai.GenerativeModel(
+            model_name=model_name, 
+            tools=[herramientas_peticion.buscar_conocimiento_base_datos] # 💡 Enlace directo seguro
+        )
+        
+        # Iniciamos el chat agéntico
+        chat = model.start_chat(enable_automatic_function_calling=True)
+        respuesta = chat.send_message(query)
+        
+        return {"respuesta": respuesta.text}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+
+
 	#print('respuesta')
 	#print(respuesta)
     return {"response": respuesta}

@@ -126,14 +126,15 @@ class Qdrant:
 
 
 
-    def search_in_qdrant(self, user_query, query_embedding, proyecto, k):
+    def search_in_qdrant(self, user_query, query_embedding, k):
         global sparse_model
         filtros = []
-        if proyecto:
+
+        if self.proyecto:
             filtros.append(
                 FieldCondition(
                     key="project",
-                    match=MatchValue(value=proyecto)
+                    match=MatchValue(value=self.proyecto)
                 )
             )
         

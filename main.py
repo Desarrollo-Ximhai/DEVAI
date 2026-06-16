@@ -434,18 +434,46 @@ async def devai_endpoint(request: Request):
         collection=bd,
         proyecto=proyecto
     )
+    objMemoria = Qdrant(
+        client=client,
+        collection=memoria,
+        proyecto=proyecto
+    )
     query_enriquecida = f"Consulta original del usuario: <QueryOriginal> {queryOriginal} </QueryOriginal>. Consulta enriquecida: <EnrichedQuery>{query_para_busqueda}</EnrichedQuery> "
     objTools = AgenteTools(objQdrant=objQdrant)
     lista_tools = [objTools.buscar_conocimiento_base_datos]
-    respuesta = generate_response(
+    response = generate_response(
         prompt=query_enriquecida,
         model_name=model_name,
         tools=lista_tools,
         system_instruction=system_instruction,
         history=historial_gemini
         )
-    
-    return respuesta["texto"]
+        
+    # memory = objMemoria.getProjectMemory(
+    #         embed_fn=embed_with_gemini,
+    #         user_query=user_query,
+    #         collection_memory=memoria,
+    #         chat_id=chat_id,
+    #         proyecto=proyecto,
+    #         limit=4
+    #     )
+        
+
+    tokens_entrada_acumulados += response["tokens_entrada"]
+    tokens_salida_acumulados += response["tokens_salida"]
+    response_text = response["texto"].strip()
+    debug(f"Query de rag, TokIn+: {tokens_entrada_acumulados}, TokOut+: {tokens_salida_acumulados}")
+
+    uuids = objMemoria.save_to_qdrant(
+        embed_fn=embed_with_gemini,
+        user_query=queryOriginal,
+        collection_memory=memoria,
+        respuesta=response_text,
+        chat_id=chat_id,
+        proyecto=proyecto
+    )
+    return {'response': response_text, 'uuids' : uuids, 'tokens_entrada' : tokens_entrada_acumulados, 'tokens_salida': tokens_salida_acumulados}, 200
 
 #
 # =================================================================

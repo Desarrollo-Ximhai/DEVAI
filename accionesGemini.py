@@ -110,9 +110,9 @@ def generate_response(prompt, model_name="models/gemini-3.1-flash-lite", archivo
                     print(f"💬 [{rol}]: {part.text.strip()}\n")
         print("──────────────────────────────────────────────────\n")
 
-        historial_dict = [type(msg).to_dict(msg) for msg in chat.history]
-        print("📁 JSON DEL HISTORIAL:")
-        print(json.dumps(historial_dict, indent=2, ensure_ascii=False))
+        # historial_dict = [type(msg).to_dict(msg) for msg in chat.history]
+        # print("📁 JSON DEL HISTORIAL:")
+        # print(json.dumps(historial_dict, indent=2, ensure_ascii=False))
 
     # 📝 MODO NORMAL: Si no hay herramientas, se ejecuta el 'generate_content' clásico
     else:

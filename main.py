@@ -439,7 +439,7 @@ async def devai_endpoint(request: Request):
     )
     #query_enriquecida = f"Consulta original del usuario: <QueryOriginal> {queryOriginal} </QueryOriginal>. Consulta enriquecida: <EnrichedQuery>{query_para_busqueda}</EnrichedQuery> "
     objTools = AgenteTools(objQdrant=objQdrant)
-    lista_tools = [objTools.buscar_conocimiento_base_datos]
+    lista_tools = [objTools.buscar_conocimiento_base_datos, objTools.ejecutar_consulta_php]
     response = generate_response(
         prompt=query,
         model_name=model_name,

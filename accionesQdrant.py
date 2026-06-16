@@ -20,47 +20,7 @@ def conectarQdrant( qdrant_url, qdrant_api_key):
             api_key=qdrant_api_key 
         )
         return client
-
-class Qdrant:
-    def __init__(self, client, collection, proyecto):
-        self.client = client
-        self.collection = collection
-        self.proyecto = proyecto
-        
-
-    
-
-    def borrar_por_chat_id(self, collection_name: str, chat_id: int):
-        """
-        Borra todos los puntos en una colección que pertenezcan a un chat_id específico.
-        """
-        filtro = Filter(
-            must=[
-                FieldCondition(
-                    key="chat_id",
-                    match=MatchValue(value=chat_id)
-                )
-            ]
-        )
-        
-        resultado = self.client.delete(
-            collection_name=collection_name,
-            points_selector=filtro
-        )
-        return resultado
-
-    def borrar_por_point_id(self, collection_name: str, point_id: str):
-        """
-        Borra un punto específico de la colección dado su ID único (UUID).
-        """
-        resultado = self.client.delete(
-            collection_name=collection_name,
-            points_selector=[point_id]
-        )
-        return resultado
-
-
-    def rerank_con_langsearch(self, query_usuario, candidatos, top_n=10):
+def rerank_con_langsearch( query_usuario, candidatos, top_n=10):
         """
         Usa la API de LangSearch para reordenar los chunks de Qdrant.
         Consumo de RAM local = 0 MB.
@@ -112,6 +72,46 @@ class Qdrant:
             print(f"⚠️ Falló la conexión con LangSearch: {e}")
             # Tu RAG no se muere si se cae la API, solo usa los primeros por defecto
             return candidatos[:top_n]
+class Qdrant:
+    def __init__(self, client, collection, proyecto):
+        self.client = client
+        self.collection = collection
+        self.proyecto = proyecto
+        
+
+    
+
+    def borrar_por_chat_id(self, collection_name: str, chat_id: int):
+        """
+        Borra todos los puntos en una colección que pertenezcan a un chat_id específico.
+        """
+        filtro = Filter(
+            must=[
+                FieldCondition(
+                    key="chat_id",
+                    match=MatchValue(value=chat_id)
+                )
+            ]
+        )
+        
+        resultado = self.client.delete(
+            collection_name=collection_name,
+            points_selector=filtro
+        )
+        return resultado
+
+    def borrar_por_point_id(self, collection_name: str, point_id: str):
+        """
+        Borra un punto específico de la colección dado su ID único (UUID).
+        """
+        resultado = self.client.delete(
+            collection_name=collection_name,
+            points_selector=[point_id]
+        )
+        return resultado
+
+
+    
 
 
     #Busqueda anterior, solo era sobre los vectores, ahora lo hacemos tambien de manera dispersa(palabras clave)

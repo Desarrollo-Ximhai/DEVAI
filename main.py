@@ -315,46 +315,6 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
     except Exception as e:
         return {'error': str(e)}, 500
 
-def enrutar_consulta(user_query: str, historial: str = "", modelo = 'models/gemini-3.1-flash-lite') -> str:
-    global tokens_entrada_acumulados
-    global tokens_salida_acumulados
-    """
-    Analiza la consulta del usuario y decide si requiere el contexto del framework (RAG)
-    o si puede ser respondida directamente por el LLM (FREE).
-    """
-    prompt_router = f"""
-    Actúas como un clasificador de consultas de alta precisión para un sistema de desarrollo de software.
-    Tu única tarea es analizar la NUEVA PREGUNTA del usuario (y el historial si es necesario) y determinar si para responderla se requiere buscar información específica dentro del código fuente, la estructura de la base de datos o los análisis del framework personalizado del usuario.
-
-    RESPONDE ÚNICAMENTE CON UNA DE ESTAS DOS PALABRAS:
-    - 'RAG': Si la pregunta menciona componentes, vistas, clases, tablas específicas, lógica del framework personalizado, o frases como "cómo se arma la consulta en X tabla".
-    - 'FREE': Si es una pregunta de conocimiento general de programación, dudas sobre APIs externas (ej. precios o modelos de Gemini), saludos, o charlas generales que el modelo puede responder con su propio conocimiento sin ver el framework.
-
-    [HISTORIAL RECIENTE]
-    {historial}
-
-    [NUEVA PREGUNTA]
-    {user_query}
-
-    DECISIÓN (Escribe solo RAG o FREE):"""
-
-    try:
-        # Usamos el modelo más rápido disponible para no penalizar la latencia
-        response = generate_response(prompt_router, modelo)
-
-        tokens_entrada_acumulados += response["tokens_entrada"]
-        tokens_salida_acumulados += response["tokens_salida"]
-        response = response["texto"].strip()
-
-        decision = response.upper()
-        debug(f"Query de enrutamiento, TokIn+: {tokens_entrada_acumulados}, TokOut+: {tokens_salida_acumulados}. Ruta: {decision}")
-        # Sanitizamos la respuesta por si el LLM añade puntos o espacios
-        if "FREE" in decision:
-            return "FREE"
-        return "RAG"
-    except Exception as e:
-        return "RAG" # Por seguridad, si falla el router, usamos el RAG
-
 
 app = FastAPI()
 
@@ -434,46 +394,47 @@ async def devai_endpoint(request: Request):
             })
 
 
-    # ruta = enrutar_consulta(query, historial)
-    # print(f"🤖 [ROUTER SEMÁNTICO] Consulta: '{query}' -> Clasificada como: {ruta}")
+    historialModificado = optimizar_y_aplanar_historial(historial, max_tokens)
+    query_para_busqueda = decontextualize_query(historialModificado, query)
+    
+    queryOriginal = query
+    query = query_para_busqueda
 
-    # if ruta == "FREE":
-    #     print('Entrando en respuesta FREE')
-    #     response = generate_response(query, model_name)
-    #     tokens_entrada_acumulados += response["tokens_entrada"]
-    #     tokens_salida_acumulados += response["tokens_salida"]
-    #     response = response["texto"].strip()
-    #     return {'response': response}, 200
 
-    # print('Entrando en respuesta RAG')
+    system_instruction = """
+        Eres un asistente de desarrollo extremadamente preciso y especializado en interpretar código PHP, HTML y SQL dentro de un framework personalizado.
 
-   
-    # 💥 AQUÍ OCURRE EL AISLAMIENTO PER-REQUEST:
-    # Creamos una instancia única para esta petición de PHP en específico
+        Tu objetivo es resolver las consultas del usuario utilizando de forma proactiva las herramientas (Tools) a tu disposición para consultar la base de datos de conocimiento, esquemas, análisis y código fuente real.
+
+        REGLAS CRÍTICAS DE OPERACIÓN:
+        1. **Veracidad Estricta:** No inventes, asumas, ni completes nada que no esté explícitamente en la información recuperada por tus herramientas. Si la información no está ahí, no existe para ti.
+        2. **Insuficiencia de Información:** Si tras ejecutar tus herramientas consideras que no hay suficiente información para responder con certeza, detén tu análisis y responde claramente que no es posible contestar, detallando con precisión qué dato o fragmento te hace falta.
+        3. **Privacidad del Contexto:** No menciones de qué fragmento de código, tabla exacta o tool provino la información. No digas cosas como "según el chunk recuperado...". Simplemente asimila el conocimiento y responde formalmente.
+        4. **Reglas del Framework (Interfaz/Vistas):** Al analizar o generar código de vistas, NO inventes inputs ni etiquetas HTML estándar, a menos que se te pida. Utiliza siempre la clase 'Ximhai' o los ejemplos de código reales obtenidos mediante tus herramientas para guiar la estructura.
+
+        REGLAS DE FORMATO Y RESPUESTA:
+        - Responde de forma concreta, profesional y directa al grano.
+        - No repitas estas instrucciones del sistema ni hagas resúmenes innecesarios de todo lo que encontraste.
+        - No generes estructuras de código incompletas o "falsas".
+        - Todo código fuente generado o citado debe ir estrictamente encasillado dentro de bloques de marcado triple: ```.
+        """ 
+
     objQdrant = Qdrant(
         client=client,
         collection=bd,
         proyecto=proyecto
     )
+    query_enriquecida = f"Consulta original del usuario: <QueryOriginal> {queryOriginal} </QueryOriginal>. Consulta enriquecida: <EnrichedQuery>{query_para_busqueda}</EnrichedQuery> "
     objTools = AgenteTools(objQdrant=objQdrant)
     lista_tools = [objTools.buscar_conocimiento_base_datos]
     respuesta = generate_response(
-        prompt=query,
+        prompt=query_enriquecida,
         model_name=model_name,
         tools=lista_tools
+        system_instruction=system_instruction
         )
     
     return respuesta["texto"]
-
-        
-    
-    
-
-
-
-	#print('respuesta')
-	#print(respuesta)
-    #return {"response": respuesta}
 
 #
 # =================================================================

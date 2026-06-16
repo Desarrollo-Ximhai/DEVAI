@@ -44,7 +44,7 @@ def embed_with_gemini(text, dimension=3072, tipo="retrieval_document"):
 #     tokens = chat_model.count_tokens(payload_total_tokens)
 #     return response.text
 
-def generate_response(prompt, model_name="models/gemini-3.1-flash-lite", archivos: list = None, configuracion = None, tools: list = None):
+def generate_response(prompt, model_name="models/gemini-3.1-flash-lite", archivos: list = None, configuracion = None, tools: list = None, system_instruction=None):
     print('modelo en generate:', model_name)
     
     gen_config = {}
@@ -69,12 +69,15 @@ def generate_response(prompt, model_name="models/gemini-3.1-flash-lite", archivo
     if tools:
         print("🤖 [INFO] Modo Agente activado. Orquestando llamadas automáticas...")
 
-        system_instruction = """
-        Eres DEVAI, un asistente experto en ingeniería de datos.
-        CRÍTICO: NO conoces la estructura, tablas, llaves ni columnas de la base de datos actual del usuario. Todo tu conocimiento interno sobre este proyecto es CERO.
-        Por lo tanto, ante CUALQUIER pregunta del usuario que involucre tablas, dueños, lotes, consultas o lógica de negocio, es OBLIGATORIO que uses primero la herramienta 'buscar_conocimiento_base_datos'.
-        Está estrictamente prohibido adivinar o inventar nombres de tablas sin haber consultado la herramienta antes.
-        """
+        # system_instruction = """
+        # Eres DEVAI, un asistente experto en ingeniería de datos.
+        # CRÍTICO: NO conoces la estructura, tablas, llaves ni columnas de la base de datos actual del usuario. Todo tu conocimiento interno sobre este proyecto es CERO.
+        # Por lo tanto, ante CUALQUIER pregunta del usuario que involucre tablas, dueños, lotes, consultas o lógica de negocio, es OBLIGATORIO que uses primero la herramienta 'buscar_conocimiento_base_datos'.
+        # Está estrictamente prohibido adivinar o inventar nombres de tablas sin haber consultado la herramienta antes.
+        # """
+
+        
+
         chat_model = genai.GenerativeModel(model_name=model_name, tools=tools, system_instruction=system_instruction)
         chat = chat_model.start_chat(enable_automatic_function_calling=True)
         response = chat.send_message(contenidos_payload, generation_config=gen_config if gen_config else None)

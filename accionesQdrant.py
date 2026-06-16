@@ -167,7 +167,7 @@ class Qdrant:
         debug(f"Busqueda en qdrant con k:{k}" )
 
         #Reranking
-        return rerank_con_langsearch(user_query, results.points, 5) 
+        return rerank_con_langsearch(user_query, results.points, 10) 
 
     def save_to_qdrant(self, embed_fn, user_query, collection_memory, respuesta, chat_id, proyecto="default"):
         

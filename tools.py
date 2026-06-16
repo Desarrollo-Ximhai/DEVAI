@@ -2,6 +2,7 @@
 from accionesGemini import conectarGemini, generate_response, embed_with_gemini
 from accionesQdrant import Qdrant, conectarQdrant
 
+import requests
 
 # =================================================================
 # Clase para tools de gemini, para poder instanciar desde main

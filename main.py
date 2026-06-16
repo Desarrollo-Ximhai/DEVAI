@@ -463,7 +463,7 @@ async def devai_endpoint(request: Request):
         tools=lista_tools
         )
     
-    return {"response": respuesta}
+    return {"response": respuesta["texto"]}
 
         
     

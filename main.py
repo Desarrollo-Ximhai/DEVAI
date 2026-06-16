@@ -13,8 +13,8 @@ import uvicorn
 from typing import Optional
 import json
 
-#para el borrado de puntos
-from accionesQdrant import conectarQdrant, borrar_por_chat_id, borrar_por_point_id, search_in_qdrant, save_to_qdrant, getProjectMemory, embebirBaseDatos
+from accionesQdrant import Qdrant, conectarQdrant
+#from accionesQdrant import conectarQdrant, borrar_por_chat_id, borrar_por_point_id, search_in_qdrant, save_to_qdrant, getProjectMemory, embebirBaseDatos
 from accionesGemini import conectarGemini, generate_response, embed_with_gemini
 
 #para la autenticacion de la API
@@ -36,8 +36,8 @@ GOOGLE_API_KEY= os.environ.get('KEY-FREE')
 tokens_entrada_acumulados =0
 tokens_salida_acumulados =0
 conectarGemini(GOOGLE_API_KEY)
-client = conectarQdrant(QDRANT_URL, QDRANT_API_KEY)
 
+client = conectarQdrant(QDRANT_URL, QDRANT_API_KEY)
 
 
 def optimizar_y_aplanar_historial(historial: Any, max_tokens: int):
@@ -252,12 +252,34 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
             return {'error': 'Failed to generate embedding 768 for query'}, 500
 
         collection_memory = memoria
-        chunksCodigo = search_in_qdrant(client, codigo, user_query, query_embedding, None, k=25 )
-        chunksBD = search_in_qdrant(client, bd,  user_query, query_embedding768, proyecto , k=40)
-        chunksArchivo = search_in_qdrant(client, archivo,  user_query, query_embedding768, None, k=10)
 
-        memory = getProjectMemory(
-            client=client,
+        objBD = Qdrant(
+            client=cliente,
+            collection=bd,
+            proyecto=proyecto
+        )
+        objCodigo = Qdrant(
+            client=cliente,
+            collection=codigo,
+            proyecto=proyecto
+        )
+        objArchivo = Qdrant(
+            client=cliente,
+            collection=archivo,
+            proyecto=proyecto
+        )
+
+        objMemoria = Qdrant(
+            client=cliente,
+            collection=collection_memory,
+            proyecto=proyecto
+        )
+
+        chunksCodigo = objCodigo.search_in_qdrant( user_query, query_embedding, None, k=25 )
+        chunksBD = objBD.search_in_qdrant(user_query, query_embedding768, proyecto , k=40)
+        chunksArchivo = objArchivo.search_in_qdrant(user_query, query_embedding768, None, k=10)
+
+        memory = objMemoria.getProjectMemory(
             embed_fn=embed_with_gemini,
             user_query=user_query,
             collection_memory=collection_memory,
@@ -278,8 +300,7 @@ def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyec
         response_text = response["texto"].strip()
         debug(f"Query de rag, TokIn+: {tokens_entrada_acumulados}, TokOut+: {tokens_salida_acumulados}")
 
-        uuids = save_to_qdrant(
-            client=client,
+        uuids = objMemoria.save_to_qdrant(
             embed_fn=embed_with_gemini,
             user_query=user_query,
             collection_memory=collection_memory,
@@ -365,6 +386,8 @@ async def devai_endpoint(request: Request):
                 "data": contenido_bytes          
             })
 
+    
+
     respuesta = query_rag(
 		user_query=query,
 		memoria=memoria,
@@ -402,7 +425,6 @@ async def devai_endpoint(request: Request):
     historial = form_data.get("historial", "")
     max_tokens = int(form_data.get("max_tokens", 6000))
 
-    # CAMBIO AQUÍ: Procesamos los archivos a un formato compatible con Gemini
     archivos_procesados = []
     for key, value in form_data.items():
         if key.startswith("files[") and hasattr(value, "filename"):
@@ -418,8 +440,6 @@ async def devai_endpoint(request: Request):
 
     if ruta == "FREE":
         print('Entrando en respuesta FREE')
-        # CASO 1: Es una pregunta general (Ej: Modelos de paga de Gemini)
-        # Consumimos directamente tu función de prompt libre (sin tocar Qdrant)
         response = generate_response(query, model_name)
         tokens_entrada_acumulados += response["tokens_entrada"]
         tokens_salida_acumulados += response["tokens_salida"]

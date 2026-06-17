@@ -64,12 +64,20 @@ def generate_response_chutes(prompt: str, model_name: str, api_key: str, archivo
     tokens_entrada_total = 0
     tokens_salida_total = 0
     final_text = ""
+    
+    # 🛡️ CONTADOR DE ITERACIONES PARA EVITAR LOCURAS N+1
+    interaciones_actuales = 0
+    max_iterations = 4 
 
-    # 4. Loop Orquestador (Modo Agente) o Petición Única (Modo Normal)
     modo_agente = bool(tools_schemas and tool_functions)
     
     while True:
-        # Armamos el body dynamicamente
+        interaciones_actuales += 1
+        if interaciones_actuales > max_iterations:
+            print(f"🛑 [AGENTE WARN] Se alcanzó el límite de protección de {max_iterations} iteraciones. Forzando cierre.")
+            # Le quitamos las herramientas en la última llamada para obligarlo a responder con lo que ya tiene
+            modo_agente = False 
+            
         body = {
             "model": model_name,
             "messages": messages,

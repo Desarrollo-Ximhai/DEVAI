@@ -597,8 +597,9 @@ async def devai_endpoint(request: Request):
     }
 
     # 3. LLAMADA AL NUEVO GENERADOR DE CHUTES (Loop ReAct manual)
-    model_name = "zai-org/GLM-5.1-TEE"
+    #model_name = "zai-org/GLM-5.1-TEE"
     #model_name = "moonshotai/Kimi-K2.5-TEE"
+    model_name = "deepseek-ai/DeepSeek-V3.2-TEE"
     response = generate_response_chutes(
         prompt=query,
         model_name=model_name,

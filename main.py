@@ -601,7 +601,7 @@ async def devai_endpoint(request: Request):
     model_name = "moonshotai/Kimi-K2.5-TEE"
     response = generate_response_chutes(
         prompt=query,
-        model_name=model_name",
+        model_name=model_name,
         api_key=CHUTES_API_KEY,
         archivos=archivos_procesados,
         tools_schemas=tools_schemas,

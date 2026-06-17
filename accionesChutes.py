@@ -14,7 +14,8 @@ def conectarChutes(key):
 
 def generate_response_chutes(prompt, model_name="nombre-de-tu-modelo-en-chutes", archivos: list = None, configuracion = None, tools_schemas: list = None, tool_functions: dict = None, system_instruction=None, history: list = None):
     print('modelo en generate Chutes:', model_name)
-    
+    #hardcodeando 
+    model_name = "zai-org/GLM-5.1-TEE"
     # Adaptar la configuración al estándar de OpenAI
     gen_config = {}
     if configuracion:

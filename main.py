@@ -16,6 +16,7 @@ import json
 from accionesQdrant import Qdrant, conectarQdrant
 #from accionesQdrant import conectarQdrant, borrar_por_chat_id, borrar_por_point_id, search_in_qdrant, save_to_qdrant, getProjectMemory, embebirBaseDatos
 from accionesGemini import conectarGemini, generate_response, embed_with_gemini
+from accionesChutes import conectarChutes, generate_response_chutes
 
 #para la autenticacion de la API
 from fastapi import Depends
@@ -35,9 +36,11 @@ QDRANT_URL = os.environ["QDRANT_URL"]
 QDRANT_API_KEY = os.environ.get("QDRANT_API_KEY") 
 KEY_FREE2 = os.environ.get("GOOGLE_API_KEY2") 
 GOOGLE_API_KEY= os.environ.get('KEY-FREE') 
+CHUTES_API_KEY= os.environ.get('CHUTES_API_KEY') 
 tokens_entrada_acumulados =0
 tokens_salida_acumulados =0
 conectarGemini(GOOGLE_API_KEY)
+conectarChutes(GOOGLE_API_KEY)
 
 client = conectarQdrant(QDRANT_URL, QDRANT_API_KEY)
 
@@ -473,6 +476,166 @@ async def devai_endpoint(request: Request):
     )
     respuesta = {'response': response_text, 'uuids' : uuids, 'tokens_entrada' : tokens_entrada_acumulados, 'tokens_salida': tokens_salida_acumulados}, 200
     return {"response": respuesta}
+
+# Implementacion con chutes, para poder usar deepseek, qwen y zai
+@app.post("/devaiAgent2", dependencies=[Depends(verificar_clave)])
+async def devai_endpoint(request: Request):
+    global client  # Tu cliente Qdrant o Chutes global si aplica
+    global tokens_entrada_acumulados
+    global tokens_salida_acumulados
+    
+    form_data = await request.form()
+    
+    query = form_data.get("query", "")
+    memoria = form_data.get("memoria", "DevAI-Memory")
+    chat_id = int(form_data.get("chat_id", 0))
+    codigo = form_data.get("codigo", "DEVAI-embeddings")
+    bd = form_data.get("basedatos", form_data.get("bd", "DevAI-DB"))
+    archivo = form_data.get("analisis", form_data.get("archivo", "DevAI-Analisis"))
+    proyecto = form_data.get("proyecto", "default")
+    
+    # IMPORTANTE: Asegúrate de mandar el nombre correcto del modelo en Chutes (ej: "chutes/deepseek-ai/DeepSeek-V3")
+    model_name = form_data.get("model_name", "chutes/deepseek-ai/DeepSeek-V3") 
+    historial = form_data.get("historial", "")
+    max_tokens = int(form_data.get("max_tokens", 6000))
+
+    archivos_procesados = []
+    for key, value in form_data.items():
+        if key.startswith("files[") and hasattr(value, "filename"):
+            contenido_bytes = await value.read()
+            archivos_procesados.append({
+                "mime_type": value.content_type,   
+                "data": contenido_bytes          
+            })
+
+    historialModificado = optimizar_y_aplanar_historial(historial, max_tokens)
+    
+    # 1. MAPEO DE HISTORIAL AL ESTÁNDAR OPENAI/CHUTES
+    historial_chutes = []
+    for turno in historialModificado:
+        rol_chutes = "assistant" if turno["role"] == "assistant" else "user"
+        historial_chutes.append({
+            "role": rol_chutes,
+            "content": turno["content"]  # En OpenAI es directo string, sin el "parts" de Gemini
+        })
+
+    system_instruction = """
+        Eres un asistente de desarrollo extremadamente preciso y especializado en interpretar código PHP, HTML y SQL dentro de un framework personalizado.
+
+        Tu objetivo es resolver las consultas del usuario utilizando de forma proactiva las herramientas (Tools) a tu disposición para consultar la base de datos de conocimiento, esquemas, análisis y código fuente real.
+
+        REGLAS CRÍTICAS DE OPERACIÓN:
+        1. **Veracidad Estricta:** No inventes, asumas, ni completes nada que no esté explícitamente en la información recuperada por tus herramientas. Si la información no está ahí, no existe para ti.
+        2. **Insuficiencia de Información:** Si tras ejecutar tus herramientas consideras que no hay suficiente información para responder con certeza, detén tu análisis y responde claramente que no es posible contestar, detallando con precisión qué dato o fragmento te hace falta.
+        3. **Privacidad del Contexto:** No menciones de qué fragmento de código, tabla exacta o tool provino la información. No digas cosas como "según el chunk recuperado...". Simplemente asimila el conocimiento y responde formalmente.
+        4. **Reglas del Framework (Interfaz/Vistas):** Al analizar o generar código de vistas, NO inventes inputs ni etiquetas HTML estándar, a menos que se te pida. Utiliza siempre la clase 'Ximhai' o los ejemplos de código reales obtenidos mediante tus herramientas para guiar la estructura.
+
+        REGLAS DE FORMATO Y RESPUESTA:
+        - Responde de forma concreta, profesional y directa al grano.
+        - No repitas estas instrucciones del sistema ni hagas resúmenes innecesarios de todo lo que encontraste.
+        - No generes estructuras de código incompletas o "falsas".
+        - Todo código fuente generado o citado debe ir estrictamente encasillado dentro de bloques de marcado triple: ```.
+        """ 
+
+    objQdrant = Qdrant(
+        client=client,  # Cliente de Qdrant asignado en tu main
+        collection=bd,
+        proyecto=proyecto
+    )
+    objMemoria = Qdrant(
+        client=client,
+        collection=memoria,
+        proyecto=proyecto
+    )
+    
+    objTools = AgenteTools(objQdrant=objQdrant)
+    
+    # 2. DEFINICIÓN DE SCHEMAS EN FORMATO OPENAI PARA LAS TOOLS
+    # Como la función de Chutes recibe JSON schema estructurado, se los declaramos explícitamente:
+    tools_schemas = [
+        {
+            "type": "function",
+            "function": {
+                "name": "buscar_conocimiento_base_datos",
+                "description": "Busca esquemas de tablas, descripciones lógicas, relaciones de llaves foráneas y lógica de negocio en la base de datos del proyecto actual",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Términos o conceptos de negocio a buscar (ej: 'mantenimientos', 'pagos')."
+                        }
+                    },
+                    "required": ["query"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "ejecutar_consulta_php",
+                "description": "Ejecuta una consulta SQL estrictamente SELECT en el servidor de producción para recuperar filas de datos reales.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "sql": {
+                            "type": "string",
+                            "description": "Sentencia SQL SELECT limpia completa y válida (ej: 'SELECT nombre, saldo FROM clientes WHERE saldo > 10000 LIMIT 20;')."
+                        }
+                    },
+                    "required": ["sql"]
+                }
+            }
+        }
+    ]
+
+    # Diccionario de mapeo asociativo para que el loop sepa qué ejecutar dinámicamente
+    tool_functions = {
+        "buscar_conocimiento_base_datos": objTools.buscar_conocimiento_base_datos,
+        "ejecutar_consulta_php": objTools.ejecutar_consulta_php
+    }
+
+    # 3. LLAMADA AL NUEVO GENERADOR DE CHUTES (Loop ReAct manual)
+    response = generate_response_chutes(
+        prompt=query,
+        model_name=model_name,
+        archivos=archivos_procesados,
+        tools_schemas=tools_schemas,
+        tool_functions=tool_functions,
+        system_instruction=system_instruction,
+        history=historial_chutes
+    )
+        
+    if response.get("status") == "error":
+        # Manejo de error limpio si falla la API de Chutes
+        return {"response": {"error": response["texto"]}}
+
+    tokens_entrada_acumulados += response["tokens_entrada"]
+    tokens_salida_acumulados += response["tokens_salida"]
+    response_text = response["texto"].strip()
+    
+    debug(f"[CHUTES] Query de rag, TokIn+: {tokens_entrada_acumulados}, TokOut+: {tokens_salida_acumulados}")
+
+    # Guardado seguro en la memoria de Qdrant (puedes seguir usando embed_with_gemini o cambiar a uno open-source)
+    uuids = objMemoria.save_to_qdrant(
+        embed_fn=embed_with_gemini,
+        user_query=query,
+        collection_memory=memoria,
+        respuesta=response_text,
+        chat_id=chat_id,
+        proyecto=proyecto
+    )
+    
+    # Estructuramos la respuesta JSON final limpia
+    respuesta_final = {
+        "response": response_text, 
+        "uuids": uuids, 
+        "tokens_entrada": tokens_entrada_acumulados, 
+        "tokens_salida": tokens_salida_acumulados
+    }
+    
+    return {"response": respuesta_final}
+
 
 #
 # =================================================================

@@ -7,16 +7,6 @@ def conectarGemini(key):
     print("--Conectando Gemini")
     genai.configure(api_key=key)
 
-def embedForCode(text):
-    print('--Embebiendo para codigo')
-    res = genai.embed_content(
-        model='models/gemini-embedding-001',
-        content=text,
-        #task_type="retrieval_document",
-        task_type="retrieval_query",
-        output_dimensionality=3072
-    )
-    return res["embedding"] if "embedding" in res else None
 
 def embed_with_gemini(text, dimension=3072, tipo="retrieval_document"):
     res = genai.embed_content(

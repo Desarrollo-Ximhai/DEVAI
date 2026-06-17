@@ -16,7 +16,7 @@ import json
 from accionesQdrant import Qdrant, conectarQdrant
 #from accionesQdrant import conectarQdrant, borrar_por_chat_id, borrar_por_point_id, search_in_qdrant, save_to_qdrant, getProjectMemory, embebirBaseDatos
 from accionesGemini import conectarGemini, generate_response, embed_with_gemini
-from accionesChutes import conectarChutes, generate_response_chutes
+from accionesChutes import  generate_response_chutes
 
 #para la autenticacion de la API
 from fastapi import Depends

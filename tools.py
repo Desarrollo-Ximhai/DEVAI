@@ -64,7 +64,7 @@ class AgenteTools:
         print(f"🚀 [Tool PHP] Ejecutando consulta solicitada por el Agente:\n👉 {sql}\n")
         
         headers = {
-            # "Authorization": f"Bearer {self.PHP_API_KEY}",
+            "Authorization": f"Bearer DVyskAc4oLtzP8YrDW",
             "Content-Type": "application/json"
         }
         payload = {"query": sql}

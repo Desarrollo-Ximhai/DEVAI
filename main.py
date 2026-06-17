@@ -638,7 +638,8 @@ async def devai_endpoint(request: Request):
         "tokens_salida": tokens_salida_acumulados
     }
     
-    return {"response": respuesta_final}
+    respuesta = {'response': response_text, 'uuids' : uuids, 'tokens_entrada' : tokens_entrada_acumulados, 'tokens_salida': tokens_salida_acumulados}, 200
+    return {"response": respuesta}
 
 
 #

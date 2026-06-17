@@ -40,7 +40,7 @@ CHUTES_API_KEY= os.environ.get('CHUTES_API_KEY')
 tokens_entrada_acumulados =0
 tokens_salida_acumulados =0
 conectarGemini(GOOGLE_API_KEY)
-conectarChutes(GOOGLE_API_KEY)
+# conectarChutes(GOOGLE_API_KEY)
 
 client = conectarQdrant(QDRANT_URL, QDRANT_API_KEY)
 
@@ -598,7 +598,8 @@ async def devai_endpoint(request: Request):
     # 3. LLAMADA AL NUEVO GENERADOR DE CHUTES (Loop ReAct manual)
     response = generate_response_chutes(
         prompt=query,
-        model_name=model_name,
+        model_name="zai-org/GLM-5.1-TEE",
+        api_key=CHUTES_API_KEY,
         archivos=archivos_procesados,
         tools_schemas=tools_schemas,
         tool_functions=tool_functions,

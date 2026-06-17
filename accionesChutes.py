@@ -1,28 +1,32 @@
+import os
 import json
-from openai import OpenAI
-from funciones import debug 
+import requests
+from funciones import debug
 
-# Cliente global de OpenAI apuntando a Chutes
-client = None
+def generate_response_chutes(prompt: str, model_name: str, api_key: str, archivos: list = None, configuracion: dict = None, tools_schemas: list = None, tool_functions: dict = None, system_instruction: str = None, history: list = None):
+    """
+    Genera una respuesta utilizando la API serverless de Chutes.ai mediante peticiones HTTP directas.
+    Soporta modo Agente con orquestación manual (Function Calling Loop) y formato multimodal.
+    """
+    print('🤖 [CHUTES] Ejecutando modelo:', model_name)
+    
+    url = "https://llm.chutes.ai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
 
-def conectarChutes(key):
-    global client
-    client = OpenAI(
-        api_key=key,
-        base_url="https://llm.chutes.ai/v1"
-    )
-
-def generate_response_chutes(prompt, model_name="nombre-de-tu-modelo-en-chutes", archivos: list = None, configuracion = None, tools_schemas: list = None, tool_functions: dict = None, system_instruction=None, history: list = None):
-    print('modelo en generate Chutes:', model_name)
-    #hardcodeando 
-    model_name = "zai-org/GLM-5.1-TEE"
-    # Adaptar la configuración al estándar de OpenAI
-    gen_config = {}
+    # 1. Configuración base del Payload
+    payload_config = {
+        "stream": False # Mantener en False para el procesamiento del backend/agente
+    }
+    
     if configuracion:
         if 'tipo' in configuracion and configuracion['tipo'] == 'application/json':
-            gen_config['response_format'] = { "type": "json_object" }
-        gen_config['temperature'] = configuracion.get('temperature', 0.2)
+            payload_config['response_format'] = { "type": "json_object" }
+        payload_config['temperature'] = configuracion.get('temperature', 0.2)
 
+    # 2. Reconstrucción del Historial de Mensajes
     messages = []
     
     if system_instruction:
@@ -31,6 +35,7 @@ def generate_response_chutes(prompt, model_name="nombre-de-tu-modelo-en-chutes",
     if history:
         messages.extend(list(history))
 
+    # 3. Formateo del Mensaje Actual (Soporte Multimodal Base64)
     user_content = []
     if prompt:
         user_content.append({"type": "text", "text": prompt})
@@ -39,6 +44,11 @@ def generate_response_chutes(prompt, model_name="nombre-de-tu-modelo-en-chutes",
         for arc in archivos:
             mime = arc.get("mime_type", "image/jpeg")
             data = arc.get("data")
+            # Si los bytes vienen crudos del Form, los codificamos a string base64 si no lo están
+            if isinstance(data, bytes):
+                import base64
+                data = base64.b64encode(data).decode('utf-8')
+                
             user_content.append({
                 "type": "image_url",
                 "image_url": {"url": f"data:{mime};base64,{data}"}
@@ -50,102 +60,118 @@ def generate_response_chutes(prompt, model_name="nombre-de-tu-modelo-en-chutes",
         else:
             messages.append({"role": "user", "content": user_content})
 
-    last_response = None  # Guardará la última respuesta de la API para las métricas
+    # Variables de control para las métricas
+    tokens_entrada_total = 0
+    tokens_salida_total = 0
+    final_text = ""
 
-    # 🤖 MODO AGENTE: Orquestación manual para function calling
-    if tools_schemas and tool_functions:
-        print("🤖 [INFO] Modo Agente activado en Chutes. Iniciando loop de orquestación...")
+    # 4. Loop Orquestador (Modo Agente) o Petición Única (Modo Normal)
+    modo_agente = bool(tools_schemas and tool_functions)
+    
+    while True:
+        # Armamos el body dynamicamente
+        body = {
+            "model": model_name,
+            "messages": messages,
+            **payload_config
+        }
+        if modo_agente:
+            body["tools"] = tools_schemas
+            body["tool_choice"] = "auto"
+
+        # Disparo HTTP a Chutes
+        response = requests.post(url, json=body, headers=headers, timeout=60)
         
-        while True:
-            response = client.chat.completions.create(
-                model=model_name,
-                messages=messages,
-                tools=tools_schemas,
-                tool_choice="auto",
-                **gen_config
-            )
-            
-            last_response = response  # Guardamos la referencia para los tokens al final
-            message = response.choices[0].message
-            
-            # ¡CRUCIAL!: Para que OpenAI no se rompa en la siguiente iteración, 
-            # debemos añadir el mensaje completo (incluyendo el campo tool_calls nativo) al historial
-            messages.append(message) 
-            
-            # Si el modelo decidió llamar a una herramienta
-            if message.tool_calls:
-                print("\n🗺️  [TRAZA DE PASOS Y RAZONAMIENTO DEL AGENTE]")
-                print("──────────────────────────────────────────────────")
-                
-                for tool_call in message.tool_calls:
-                    func_name = tool_call.function.name
-                    func_args = json.loads(tool_call.function.arguments)
-                    
-                    print(f"🧠 [LLM PENSÓ]: Necesito extraer datos del sistema.")
-                    print(f"   ↳ 🛠️  Llamando a: '{func_name}'")
-                    print(f"   ↳ 📋 Argumentos calculados: {func_args}\n")
-                    
-                    if func_name in tool_functions:
-                        function_to_call = tool_functions[func_name]
-                        function_response = function_to_call(**func_args)
-                        
-                        print(f"⚙️  [PYTHON EJECUTÓ]: '{func_name}'")
-                        print(f"   ↳ 📥 Datos devueltos al LLM con éxito.\n")
-                        
-                        # Si tu función ya retorna un string (o JSON stringificado), lo dejamos pasar directo.
-                        # Si retorna un dict/list, lo convertimos a string.
-                        content_str = function_response if isinstance(function_response, str) else json.dumps(function_response, ensure_ascii=False)
-                        
-                        # CORRECCIÓN DE FORMATO: Así se inyecta la respuesta al historial en OpenAI
-                        messages.append({
-                            "role": "tool",
-                            "tool_call_id": tool_call.id,
-                            "name": func_name,
-                            "content": content_str
-                        })
-                    else:
-                        print(f"⚠️ [ERROR]: La función '{func_name}' no existe en el diccionario.")
-                        messages.append({
-                            "role": "tool",
-                            "tool_call_id": tool_call.id,
-                            "name": func_name,
-                            "content": '{"error": "Función no encontrada en el Agente de Herramientas."}'
-                        })
-                print("──────────────────────────────────────────────────\n")
-                
-                # Continuamos el ciclo "while" para que el modelo analice las respuestas que le inyectamos
-                continue 
-            
-            else:
-                # El modelo terminó su razonamiento y dio texto plano (Respuesta Final)
-                print(f"💬 [CHUTES (Respuesta Final)]: {message.content.strip()}\n")
-                break
-                
-    # 📝 MODO NORMAL: Sin herramientas
-    else:
-        response = client.chat.completions.create(
-            model=model_name,
-            messages=messages,
-            **gen_config
-        )
-        last_response = response
-        message = response.choices[0].message
+        if response.status_code != 200:
+            print(f"❌ [CHUTES ERROR {response.status_code}]: {response.text}")
+            return {
+                "texto": f"Error en el proveedor Chutes (HTTP {response.status_code})",
+                "tokens_entrada": 0,
+                "tokens_salida": 0,
+                "status": "error"
+            }
 
-    # Extracción segura de métricas
-    try:
-        tokens_entrada = last_response.usage.prompt_tokens
-        tokens_salida = last_response.usage.completion_tokens
-    except Exception:
-        tokens_entrada = 0
-        tokens_salida = 0
-    
-    print(f"--- Info de la petición ---")
-    print(f"Tokens Entrada: {tokens_entrada} | Tokens Salida: {tokens_salida}")
+        res_data = response.json()
+        choice = res_data["choices"][0]
+        message_obj = choice["message"]
+        
+        # Acumulación de métricas de consumo provistas por Chutes
+        usage = res_data.get("usage", {})
+        tokens_entrada_total = usage.get("prompt_tokens", tokens_entrada_total)
+        tokens_salida_total = usage.get("completion_tokens", tokens_salida_total)
+
+        # Si el modelo no usó herramientas o no estamos en modo agente, terminamos de inmediato
+        if not modo_agente:
+            final_text = message_obj.get("content", "")
+            break
+
+        # Para el flujo del agente, guardamos el mensaje de la IA tal como nos llegó
+        # Convertimos la estructura de vuelta a formato plano para el payload consecutivo
+        ai_message_to_history = {
+            "role": "assistant",
+            "content": message_obj.get("content")
+        }
+        if "tool_calls" in message_obj:
+            ai_message_to_history["tool_calls"] = message_obj["tool_calls"]
+            
+        messages.append(ai_message_to_history)
+
+        # Verificamos si se invocaron herramientas
+        tool_calls = message_obj.get("tool_calls")
+        if tool_calls:
+            print("\n🗺️  [TRAZA DE PASOS Y RAZONAMIENTO DEL AGENTE - CHUTES]")
+            print("──────────────────────────────────────────────────")
+            
+            for tool_call in tool_calls:
+                func_id = tool_call.get("id")
+                func_meta = tool_call.get("function", {})
+                func_name = func_meta.get("name")
+                func_args = json.loads(func_meta.get("arguments", "{}"))
+                
+                print(f"🧠 [LLM PENSÓ]: Requiero extraer datos contextuales.")
+                print(f"   ↳ 🛠️  Llamando a: '{func_name}'")
+                print(f"   ↳ 📋 Argumentos calculados: {func_args}\n")
+                
+                if func_name in tool_functions:
+                    function_to_call = tool_functions[func_name]
+                    # Ejecutamos la lógica local (ej: buscar en Qdrant)
+                    function_response = function_to_call(**func_args)
+                    
+                    print(f"⚙️  [PYTHON EJECUTÓ]: '{func_name}'")
+                    print(f"   ↳ 📥 Datos devueltos al LLM con éxito.\n")
+                    
+                    content_str = function_response if isinstance(function_response, str) else json.dumps(function_response, ensure_ascii=False)
+                    
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": func_id,
+                        "name": func_name,
+                        "content": content_str
+                    })
+                else:
+                    print(f"⚠️ [ERROR]: La función '{func_name}' no se encuentra en el registro.")
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": func_id,
+                        "name": func_name,
+                        "content": '{"error": "Función no registrada en el agente."}'
+                    })
+            print("──────────────────────────────────────────────────\n")
+            # Continuamos el bucle "while" para enviar las respuestas de las herramientas a la IA
+            continue
+        else:
+            # La IA no llamó a más herramientas, tenemos la respuesta final del agente
+            final_text = message_obj.get("content", "")
+            print(f"💬 [CHUTES Agente (Respuesta Final)]: {final_text.strip()}\n")
+            break
+
+    print(f"--- Info de la petición Chutes ---")
+    print(f"Tokens Entrada Acumulados: {tokens_entrada_total} | Tokens Salida Acumulados: {tokens_salida_total}")
     print(f"───────────────────────────")
-    
+
     return {
-        "texto": message.content,
-        "tokens_entrada": tokens_entrada,
-        "tokens_salida": tokens_salida,
+        "texto": final_text,
+        "tokens_entrada": tokens_entrada_total,
+        "tokens_salida": tokens_salida_total,
         "status": "success"
     }

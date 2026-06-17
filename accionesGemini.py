@@ -46,15 +46,16 @@ def embed_with_gemini(text, dimension=3072, tipo="retrieval_document"):
 #     tokens = chat_model.count_tokens(payload_total_tokens)
 #     return response.text
 
+import google.api_core.exceptions as google_exceptions
+from fastapi import HTTPException  # ← Crucial importar esto
+
 def generate_response(prompt, model_name="models/gemini-3.1-flash-lite", archivos: list = None, configuracion = None, tools: list = None, system_instruction=None, history:list = None):
     print('modelo en generate:', model_name)
     
     gen_config = {}
-
     if configuracion:
         if 'tipo' in configuracion:
             gen_config['response_mime_type'] = configuracion['tipo']
-        
         gen_config['temperature'] = configuracion.get('temperature', 0.2)
 
     chat_model = genai.GenerativeModel(model_name=model_name, tools=tools)
@@ -67,80 +68,73 @@ def generate_response(prompt, model_name="models/gemini-3.1-flash-lite", archivo
                 "data": arc["data"]
             })
 
-    # 🤖 MODO AGENTE: Si hay herramientas, usamos 'start_chat' para ejecución automática
+    # 🛑 Función interna para lanzar los errores HTTP correctos hacia PHP
+    def lanzar_error_api(e):
+        print(f"❌ [ERROR EN GEMINI API]: {str(e)}")
+        
+        # Detectamos si es un error de cuota superada
+        es_error_cuota = isinstance(e, google_exceptions.ResourceExhausted) or \
+                         "quota" in str(e).lower() or \
+                         "429" in str(e) or \
+                         "resourceexhausted" in str(e).lower()
+                         
+        if es_error_cuota:
+            # Lanzamos un HTTP 429 real con el mensaje personalizado
+            raise HTTPException(
+                status_code=429,
+                detail="⚠️ [Error de Cuota] Has superado el límite de peticiones permitidas por minuto en Gemini. Por favor, espera unos segundos antes de enviar otro mensaje."
+            )
+        else:
+            # Para cualquier otro error de la IA (ej. prompt bloqueado, error de modelo, etc.)
+            raise HTTPException(
+                status_code=500,
+                detail=f"💥 [Error de Gemini]: No se pudo completar la solicitud de IA. Detalle: {str(e)}"
+            )
+
+    # 🤖 MODO AGENTE
     if tools:
         print("🤖 [INFO] Modo Agente activado. Orquestando llamadas automáticas...")
-
-        # system_instruction = """
-        # Eres DEVAI, un asistente experto en ingeniería de datos.
-        # CRÍTICO: NO conoces la estructura, tablas, llaves ni columnas de la base de datos actual del usuario. Todo tu conocimiento interno sobre este proyecto es CERO.
-        # Por lo tanto, ante CUALQUIER pregunta del usuario que involucre tablas, dueños, lotes, consultas o lógica de negocio, es OBLIGATORIO que uses primero la herramienta 'buscar_conocimiento_base_datos'.
-        # Está estrictamente prohibido adivinar o inventar nombres de tablas sin haber consultado la herramienta antes.
-        # """
-
-        
-
         chat_model = genai.GenerativeModel(model_name=model_name, tools=tools, system_instruction=system_instruction)
         chat = chat_model.start_chat(history=history, enable_automatic_function_calling=True)
-        response = chat.send_message(contenidos_payload, generation_config=gen_config if gen_config else None)
         
-        # 🔍 IMPRIMIR EL RAZONAMIENTO Y PASOS INTERMEDIOS DEL LLM
+        try:
+            response = chat.send_message(contenidos_payload, generation_config=gen_config if gen_config else None)
+        except Exception as e:
+            lanzar_error_api(e) # Esto corta la ejecución y manda el 429 o 500
+        
+        # Trazas de pasos intermedios (Solo se ejecutan si todo salió bien)
         print("\n🗺️  [TRAZA DE PASOS Y RAZONAMIENTO DEL AGENTE]")
         print("──────────────────────────────────────────────────")
         for mensaje in chat.history:
             for part in mensaje.parts:
                 part_dict = type(part).to_dict(part) if hasattr(type(part), 'to_dict') else {}
-                # Pasó 1: ¿El LLM decidió que necesitaba usar una herramienta?
                 if 'function_call' in part_dict:
-                    print(f"🧠 [LLM PENSÓ]: Necesito extraer datos del sistema.")
-                    print(f"   ↳ 🛠️  Llamando a: '{part.function_call.name}'")
-                    args = dict(part.function_call.args)
-                    print(f"   ↳ 📋 Argumentos calculados: {args}\n")
-                
-                # Paso 2: ¿Es la respuesta que tu código de Python (Qdrant) le inyectó de vuelta?
+                    print(f"🧠 [LLM PENSÓ]: Necesito extraer datos del sistema. Llamando a: '{part.function_call.name}'")
                 elif 'function_response' in part_dict:
-                    nombre_func = part_dict['function_response'].get('name', 'desconocida')
-                    print(f"⚙️  [PYTHON EJECUTÓ]: '{nombre_func}'")
-                    print(f"   ↳ 📥 Datos devueltos a Gemini con éxito.")
-                    print(f"   ↳ (Tu Qdrant ya le entregó el contexto a la IA)\n")
-                
-                # Paso 3: ¿Es texto plano? (Prompt inicial o respuesta final)
+                    print(f"⚙️  [PYTHON EJECUTÓ]: '{part_dict['function_response'].get('name')}' -> Datos devueltos.")
                 elif 'text' in part_dict:
-                    rol = "USUARIO (Prompt)" if mensaje.role == "user" else "GEMINI (Respuesta Final)"
+                    rol = "USUARIO" if mensaje.role == "user" else "GEMINI"
                     print(f"💬 [{rol}]: {part.text.strip()}\n")
         print("──────────────────────────────────────────────────\n")
 
-        # historial_dict = [type(msg).to_dict(msg) for msg in chat.history]
-        # print("📁 JSON DEL HISTORIAL:")
-        # print(json.dumps(historial_dict, indent=2, ensure_ascii=False))
-
-    # 📝 MODO NORMAL: Si no hay herramientas, se ejecuta el 'generate_content' clásico
+    # 📝 MODO NORMAL
     else:
-        response = chat_model.generate_content(
-            contenidos_payload,
-            generation_config=gen_config if gen_config else None
-        )
-
-    # response = chat_model.generate_content(
-    #     contenidos_payload,
-    #     generation_config=gen_config if gen_config else None
-    #     )
+        try:
+            response = chat_model.generate_content(
+                contenidos_payload,
+                generation_config=gen_config if gen_config else None
+            )
+        except Exception as e:
+            lanzar_error_api(e)
     
+    # Extraemos metadata si todo fue exitoso
     uso_tokens = response.usage_metadata
     tokens_entrada = uso_tokens.prompt_token_count
     tokens_salida = uso_tokens.candidates_token_count
     
-    print(f"--- Info de la petición ---")
-    print(f"Tokens Entrada: {tokens_entrada} | Tokens Salida: {tokens_salida}")
-    print(f"───────────────────────────")
-    #print('Respuesta:')
-    #print(response.text)
-    # # Opción A: Si solo necesitas el texto como antes, dejas esto:
-    # return {"response": response.text, tokens_entrada}
-    # return response.text
-    
     return {
         "texto": response.text,
         "tokens_entrada": tokens_entrada,
-        "tokens_salida": tokens_salida
+        "tokens_salida": tokens_salida,
+        "status": "success"
     }

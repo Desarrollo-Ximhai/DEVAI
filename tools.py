@@ -49,17 +49,16 @@ class AgenteTools:
 # =================================================================
     def ejecutar_consulta_php(self, sql: str) -> str:
         """
-        Ejecuta una consulta SQL puramente de tipo SELECT en el servidor de producción 
-        para recuperar registros y datos reales y actuales del sistema.
+        Ejecuta exclusivamente sentencias SQL de tipo SELECT para recuperar datos reales de las filas.
         
-        CRÍTICO: Usa esta herramienta SOLO cuando necesites conocer datos específicos de filas, 
-        totales, conteos o registros que el usuario solicitó explícitamente.
+        PROHIBIDO: No intentes usar comandos de inspección de esquemas como DESCRIBE, SHOW TABLES, 
+        SHOW COLUMNS, EXPLAIN o similares. Si no conoces el nombre de una tabla o columna, es obligatorio 
+        que uses primero la herramienta 'buscar_conocimiento_base_datos' para conocer el esquema.
         
         Args:
-            sql: Sentencia SQL SELECT completa, limpia y válida (ej: 'SELECT nombre, saldo FROM clientes WHERE saldo > 10000 LIMIT 20;').
-            
+            sql: Sentencia SQL que inicie estrictamente con 'SELECT'.
         Returns:
-            Un string en formato JSON con las filas encontradas o un mensaje detallado si ocurrió un error.
+            JSON con los registros o string de error.
         """
         print(f"🚀 [Tool PHP] Ejecutando consulta solicitada por el Agente:\n👉 {sql}\n")
         

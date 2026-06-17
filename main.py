@@ -529,6 +529,7 @@ async def devai_endpoint(request: Request):
         2. **Insuficiencia de Información:** Si tras ejecutar tus herramientas consideras que no hay suficiente información para responder con certeza, detén tu análisis y responde claramente que no es posible contestar, detallando con precisión qué dato o fragmento te hace falta.
         3. **Privacidad del Contexto:** No menciones de qué fragmento de código, tabla exacta o tool provino la información. No digas cosas como "según el chunk recuperado...". Simplemente asimila el conocimiento y responde formalmente.
         4. **Reglas del Framework (Interfaz/Vistas):** Al analizar o generar código de vistas, NO inventes inputs ni etiquetas HTML estándar, a menos que se te pida. Utiliza siempre la clase 'Ximhai' o los ejemplos de código reales obtenidos mediante tus herramientas para guiar la estructura.
+        5. **Eficiencia SQL Estricta (PROHIBIDO BUCLES N+1):** Cuando uses la herramienta 'ejecutar_consulta_php', está TERMINANTEMENTE PROHIBIDO realizar múltiples consultas consecutivas o individuales para procesar listas de elementos. Si necesitas datos de varios registros o validar una lista, debes estructurar UNA SOLA CONSULTA limpia utilizando operadores como 'IN', 'BETWEEN' o agrupaciones mediante 'INNER JOIN'. Maximiza la eficiencia y minimiza las llamadas al servidor.
 
         REGLAS DE FORMATO Y RESPUESTA:
         - Responde de forma concreta, profesional y directa al grano.
@@ -596,9 +597,11 @@ async def devai_endpoint(request: Request):
     }
 
     # 3. LLAMADA AL NUEVO GENERADOR DE CHUTES (Loop ReAct manual)
+    #model_name = "zai-org/GLM-5.1-TEE"
+    model_name = "moonshotai/Kimi-K2.5-TEE"
     response = generate_response_chutes(
         prompt=query,
-        model_name="zai-org/GLM-5.1-TEE",
+        model_name=model_name",
         api_key=CHUTES_API_KEY,
         archivos=archivos_procesados,
         tools_schemas=tools_schemas,

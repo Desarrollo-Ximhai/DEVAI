@@ -67,7 +67,12 @@ def generate_response_chutes(prompt: str, model_name: str, api_key: str, archivo
     
     # 🛡️ CONTADOR DE ITERACIONES PARA EVITAR LOCURAS N+1
     interaciones_actuales = 0
-    max_iterations = 4 
+    max_iterations = 6 
+
+    print("\n🗺️  Historial y messages")
+    print("──────────────────────────────────────────────────")
+    print(messages)
+    print("──────────────────────────────────────────────────")
 
     modo_agente = bool(tools_schemas and tool_functions)
     

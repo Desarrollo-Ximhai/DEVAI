@@ -85,13 +85,13 @@ class AgenteTools:
                 
             # --- EL GUARDRAIL MÁS IMPORTANTE: Control de volumen ---
             resultados = data_php.get("resultado", [])
-            if len(resultados) > 100:
-                # Truncamos para no saturar la ventana de contexto de Gemini
-                resultados_truncados = resultados[:100]
-                return json.dumps({
-                    "aviso": f"Se encontraron {len(resultados)} registros. Mostrando solo los primeros 100 por seguridad de memoria.",
-                    "data": resultados_truncados
-                }, ensure_ascii=False)
+            # if len(resultados) > 100:
+            #     # Truncamos para no saturar la ventana de contexto de Gemini
+            #     resultados_truncados = resultados[:100]
+            #     return json.dumps({
+            #         "aviso": f"Se encontraron {len(resultados)} registros. Mostrando solo los primeros 100 por seguridad de memoria.",
+            #         "data": resultados_truncados
+            #     }, ensure_ascii=False)
                 
             return json.dumps(resultados, ensure_ascii=False)
             

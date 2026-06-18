@@ -1,0 +1,199 @@
+
+2026-06-18T15:32:52.988130186Z 🤖 [CHUTES] Ejecutando modelo: Qwen/Qwen3.5-397B-A17B-TEE
+2026-06-18T15:32:52.988135037Z 
+2026-06-18T15:32:52.988139647Z 🗺️  [TRAZA DE PASOS Y RAZONAMIENTO DEL AGENTE - CHUTES]
+2026-06-18T15:32:52.988145087Z ──────────────────────────────────────────────────
+2026-06-18T15:32:52.988151137Z 🧠 [LLM PENSÓ]: Requiero extraer datos contextuales.
+2026-06-18T15:32:52.988155947Z    ↳ 🛠️  Llamando a: 'buscar_conocimiento_base_datos'
+2026-06-18T15:32:52.988161747Z    ↳ 📋 Argumentos calculados: {'query': 'lotes casas propietarios'}
+2026-06-18T15:32:52.988166087Z 
+2026-06-18T15:32:52.988170687Z Buscando en base de datos con tool. lotes casas propietarios
+2026-06-18T15:32:52.988185458Z Busqueda en qdrant con k:20
+2026-06-18T15:32:52.988190098Z ⚠️ LangSearch respondió con error 500, usando fallback.
+2026-06-18T15:32:52.988194578Z ──────────────────────────────────────────────────
+2026-06-18T15:32:52.988202178Z 🚨 [DETALLE DEL ERROR DE LANGSEARCH]:
+2026-06-18T15:32:52.988206728Z {'code': '500', 'message': 'rerank engine error', 'log_id': '4c69b09325a215d0'}
+2026-06-18T15:32:52.988211189Z ──────────────────────────────────────────────────
+2026-06-18T15:32:52.988215689Z ⚙️  [PYTHON EJECUTÓ]: 'buscar_conocimiento_base_datos'
+2026-06-18T15:32:52.988234759Z    ↳ 📥 Datos devueltos al LLM con éxito.
+2026-06-18T15:32:52.988237709Z 
+2026-06-18T15:32:52.98824072Z    ↳ 📄 [CONTENIDO ENVIADO]: # TABLA: lotes
+2026-06-18T15:32:52.988244589Z **Descripción Lógica:** Catálogo de propiedades (lotes) dentro del desarrollo, identificando a su propietario y su tipo de clasificación.
+2026-06-18T15:32:52.98824727Z 
+2026-06-18T15:32:52.98825042Z ## SQL ORIGINAL:
+2026-06-18T15:32:52.98825408Z CREATE TABLE `lotes` (
+2026-06-18T15:32:52.98825713Z   `idLote` int(10) UNSIGNED NOT NULL,
+2026-06-18T15:32:52.98826015Z   `idTipoDeLote` int(10) UNSIGNED NOT NULL,
+2026-06-18T15:32:52.98826321Z   `numero` int(2) NOT NULL,
+2026-06-18T15:32:52.9882664Z   `propietario` varchar(100) NOT NULL,
+2026-06-18T15:32:52.98826946Z   `creadoEl` datetime NOT NULL,
+2026-06-18T15:32:52.98827232Z   `creadoPor` varchar(50) NOT NULL,
+2026-06-18T15:32:52.98827505Z   `actualizadoEl` datetime DEFAULT NULL,
+2026-06-18T15:32:52.988277861Z   `actualizadoPor` varchar(50) DEFAULT NULL
+2026-06-18T15:32:52.988280841Z ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+2026-06-18T15:32:52.988283531Z 
+2026-06-18T15:32:52.988288701Z ---
+2026-06-18T15:32:52.988291241Z 
+2026-06-18T15:32:52.988294041Z # TABLA: tipos_de_lote
+2026-06-18T15:32:52.988297621Z **Descripción Lógica:** Clasificación de los lotes (ej. Casa, Terreno, Obra) para aplicar reglas de negocio diferenciadas.
+2026-06-18T15:32:52.988300351Z 
+2026-06-18T15:32:52.988303061Z ## SQL ORIGINAL:
+2026-06-18T15:32:52.988305841Z CREATE TABLE `tipos_de_lote` (
+2026-06-18T15:32:52.988308871Z   `idTipoDeLote` int(10) UNSIGNED NOT NULL,
+2026-06-18T15:32:52.988311711Z   `nombre` varchar(45) NOT NULL,
+2026-06-18T15:32:52.988314482Z   `icono` varchar(45) NOT NULL,
+2026-06-18T15:32:52.988317771Z   `estatus` tinyint(4) NOT NULL DEFAULT 1
+2026-06-18T15:32:52.988320582Z ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+2026-06-18T15:32:52.988323292Z 
+2026-06-18T15:32:52.988326002Z ---
+2026-06-18T15:32:52.988328622Z 
+2026-06-18T15:32:52.988331422Z # TABLA: enums
+2026-06-18T15:32:52.988334402Z **Descripción Lógica:** Tabla de referencia para estandarizar tipos de lotes y formas de pago aceptadas en el sistema.
+2026-06-18T15:32:52.988337432Z 
+2026-06-18T15:32:52.988340462Z ## SQL ORIGINAL:
+2026-06-18T15:32:52.988343732Z CREATE TABLE `enums` (
+2026-06-18T15:32:52.988346562Z   `idEnum` int(11) NOT NULL,
+2026-06-18T15:32:52.988349532Z   `tipoLote` enum('Casa','Terreno','Obra') DEFAULT NULL,
+2026-06-18T15:32:52.988352232Z   `formaDePago` enum('Efectivo','Transferencia','Depósito') NOT NULL
+2026-06-18T15:32:52.988355172Z ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+2026-06-18T15:32:52.988357853Z 
+2026-06-18T15:32:52.988360503Z ---
+2026-06-18T15:32:52.988362993Z 
+2026-06-18T15:32:52.988365713Z # TABLA: conceptos_de_lotes
+2026-06-18T15:32:52.988368783Z **Descripción Lógica:** Tabla intermedia que asocia conceptos específicos a lotes particulares, permitiendo personalizar los cargos por cada propiedad.
+2026-06-18T15:32:52.988371413Z 
+2026-06-18T15:32:52.988374103Z ## SQL ORIGINAL:
+2026-06-18T15:32:52.988376893Z CREATE TABLE `conceptos_de_lotes` (
+2026-06-18T15:32:52.988379843Z   `idLote` int(10) UNSIGNED NOT NULL,
+2026-06-18T15:32:52.988382673Z   `idConcepto` int(10) UNSIGNED NOT NULL,
+2026-06-18T15:32:52.988385424Z   `monto` decimal(10,2) NOT NULL
+2026-06-18T15:32:52.988388344Z ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+2026-06-18T15:32:52.988391044Z 
+2026-06-18T15:32:52.988393654Z ---
+2026-06-18T15:32:52.988429495Z 
+2026-06-18T15:32:52.988434925Z Relaciones de la tabla `lotes`:
+2026-06-18T15:32:52.988438685Z - Constraint `fk_lotes_tiposDeLote1`: `lotes`.`idTipoDeLote` referencia `tipos_de_lote`.`idTipoDeLote`
+2026-06-18T15:32:52.988441365Z 
+2026-06-18T15:32:52.988444005Z ---
+2026-06-18T15:32:52.988446525Z 
+2026-06-18T15:32:52.988449265Z # TABLA: mensualidades
+2026-06-18T15:32:52.988452135Z **Descripción Lógica:** Define los periodos de cobro para cada lote, estableciendo fechas límite de pago para las obligaciones de los propietarios.
+2026-06-18T15:32:52.988454715Z 
+2026-06-18T15:32:52.988457435Z ## SQL ORIGINAL:
+2026-06-18T15:32:52.988460226Z CREATE TABLE `mensualidades` (
+2026-06-18T15:32:52.988462975Z   `idMensualidad` int(10) UNSIGNED NOT NULL,
+2026-06-18T15:32:52.988465826Z   `idLote` int(10) UNSIGNED NOT NULL,
+2026-06-18T15:32:52.988468566Z   `fechaLimite` date NOT NULL,
+2026-06-18T15:32:52.988471286Z   `observaciones` varchar(250) DEFAULT NULL
+2026-06-18T15:32:52.988474026Z ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+2026-06-18T15:32:52.988476696Z 
+2026-06-18T15:32:52.988479326Z ---
+2026-06-18T15:32:52.988481916Z 
+2026-06-18T15:32:52.988484526Z # TABLA: residentes
+2026-06-18T15:32:52.988487366Z **Descripción Lógica:** Directorio de personas que habitan o son dueños de los lotes, con credenciales para acceso al sistema.
+2026-06-18T15:32:52.988489936Z 
+2026-06-18T15:32:52.988492676Z ## SQL ORIGINAL:
+2026-06-18T15:32:52.988495316Z CREATE TABLE `residentes` (
+2026-06-18T15:32:52.988497987Z   `idResidente` int(10) UNSIGNED NOT NULL,
+2026-06-18T15:32:52.988500757Z   `nombre` varchar(150) NOT NULL,
+2026-06-18T15:32:52.988503607Z   `telefono` varchar(20) DEFAULT NULL,
+2026-06-18T15:32:52.988506457Z   `correo` varchar(60) NOT NULL,
+2026-06-18T15:32:52.988509247Z   `password` char(40) NOT NULL,
+2026-06-18T15:32:52.988511977Z   `creadoEl` datetime NOT NULL,
+2026-06-18T15:32:52.988514657Z   `creadoPor` varchar(50) NOT NULL,
+2026-06-18T15:32:52.988517337Z   `actualizadoEl` datetime DEFAULT NULL,
+2026-06-18T15:32:52.988533597Z   `actualizadoPor` varchar(50) DEFAULT NULL
+2026-06-18T15:32:52.988536568Z ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+2026-06-18T15:32:52.988539188Z 
+2026-06-18T15:32:52.988541908Z ---
+2026-06-18T15:32:52.988544508Z 
+2026-06-18T15:32:52.988547328Z # TABLA: recibos
+2026-06-18T15:32:52.988550208Z **Descripción Lógica:** Documento legal que ampara el pago realizado por un propietario, conteniendo información sobre el lote, folio y forma de pago.
+2026-06-18T15:32:52.988552998Z 
+2026-06-18T15:32:52.988555678Z ## SQL ORIGINAL:
+2026-06-18T15:32:52.988558588Z CREATE TABLE `recibos` (
+2026-06-18T15:32:52.988561388Z   `idRecibo` int(10) UNSIGNED NOT NULL,
+2026-06-18T15:32:52.988564048Z   `idLote` int(10) UNSIGNED NOT NULL,
+2026-06-18T15:32:52.988566898Z   `folio` varchar(6) NOT NULL,
+2026-06-18T15:32:52.988569718Z   `fecha` date NOT NULL,
+2026-06-18T15:32:52.988572449Z   `nombre` varchar(45) NOT NULL,
+2026-06-18T15:32:52.988575119Z   `concepto` varchar(150) DEFAULT NULL,
+2026-06-18T15:32:52.988577749Z   `formaDePago` varchar(20) NOT NULL,
+2026-06-18T15:32:52.988580499Z   `creadoEl` datetime NOT NULL,
+2026-06-18T15:32:52.988583169Z   `creadoPor` varchar(50) NOT NULL,
+2026-06-18T15:32:52.988585789Z   `actualizadoEl` datetime DEFAULT NULL,
+2026-06-18T15:32:52.988588529Z   `actualizadoPor` varchar(50) DEFAULT NULL
+2026-06-18T15:32:52.988591229Z ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+2026-06-18T15:32:52.988593759Z 
+2026-06-18T15:32:52.988596289Z ---
+2026-06-18T15:32:52.988602739Z 
+2026-06-18T15:32:52.98860551Z Resumen del schema del proyecto `EBANO`:
+2026-06-18T15:32:52.98860837Z - `conceptos`: columnas 
+2026-06-18T15:32:52.98861109Z - `conceptos_de_lotes`: columnas 
+2026-06-18T15:32:52.98861389Z - `conceptos_mensualidades`: columnas 
+2026-06-18T15:32:52.98861678Z - `conceptos_recibos`: columnas 
+2026-06-18T15:32:52.98861954Z - `cuentas`: columnas 
+2026-06-18T15:32:52.98862222Z - `enums`: columnas 
+2026-06-18T15:32:52.988625Z - `gastos`: columnas 
+2026-06-18T15:32:52.98862787Z - `lotes`: columnas 
+2026-06-18T15:32:52.98863059Z - `mensualidades`: columnas 
+2026-06-18T15:32:52.98863331Z - `movimientos`: columnas 
+2026-06-18T15:32:52.98863613Z - `permisos`: columnas 
+2026-06-18T15:32:52.988638811Z - `recibos`: columnas 
+2026-06-18T15:32:52.988641611Z - `residentes`: columnas 
+2026-06-18T15:32:52.9886444Z - `roles`: columnas 
+2026-06-18T15:32:52.988647111Z - `tipos_de_lote`: columnas 
+2026-06-18T15:32:52.988650521Z - `usuarios`: columnas idUsuario, idRol, nombre, usuario, password, creadoEl, creadoPor, actualizadoEl, actualizadoPor, estatus, ultimaFechaIngreso, codigoTemporal, fechaDeCodigo, galleta
+2026-06-18T15:32:52.988653151Z 
+2026-06-18T15:32:52.988655841Z ---
+2026-06-18T15:32:52.988658361Z 
+2026-06-18T15:32:52.988661161Z Relaciones de la tabla `mensualidades`:
+2026-06-18T15:32:52.988664551Z - Constraint `fk_mensualidades_lotes1`: `mensualidades`.`idLote` referencia `lotes`.`idLote`
+2026-06-18T15:32:52.988667221Z 
+2026-06-18T15:32:52.988669941Z ──────────────────────────────────────────────────
+2026-06-18T15:32:52.988672571Z 
+2026-06-18T15:32:52.988675032Z 
+2026-06-18T15:32:52.988677721Z 🗺️  [TRAZA DE PASOS Y RAZONAMIENTO DEL AGENTE - CHUTES]
+2026-06-18T15:32:52.988680532Z ──────────────────────────────────────────────────
+2026-06-18T15:32:52.988683482Z 🧠 [LLM PENSÓ]: Requiero extraer datos contextuales.
+2026-06-18T15:32:52.988686302Z    ↳ 🛠️  Llamando a: 'ejecutar_consulta_php'
+2026-06-18T15:32:52.988689772Z    ↳ 📋 Argumentos calculados: {'sql': "SELECT l.numero, l.propietario, t.nombre AS tipo_lote FROM lotes l INNER JOIN tipos_de_lote t ON l.idTipoDeLote = t.idTipoDeLote WHERE t.nombre = 'Casa' ORDER BY l.numero;"}
+2026-06-18T15:32:52.988694562Z 
+2026-06-18T15:32:52.988697452Z 🚀 [Tool PHP] Ejecutando consulta solicitada por el Agente:
+2026-06-18T15:32:52.988700712Z 👉 SELECT l.numero, l.propietario, t.nombre AS tipo_lote FROM lotes l INNER JOIN tipos_de_lote t ON l.idTipoDeLote = t.idTipoDeLote WHERE t.nombre = 'Casa' ORDER BY l.numero;
+2026-06-18T15:32:52.988703422Z 
+2026-06-18T15:32:52.988706132Z ⚙️  [PYTHON EJECUTÓ]: 'ejecutar_consulta_php'
+2026-06-18T15:32:52.988708892Z    ↳ 📥 Datos devueltos al LLM con éxito.
+2026-06-18T15:32:52.988711382Z 
+2026-06-18T15:32:52.988716962Z    ↳ 📄 [CONTENIDO ENVIADO]: {"aviso": "Se encontraron 1252 registros. Mostrando solo los primeros 100 por seguridad de memoria.", "data": "[{\"numero\":2,\"propietario\":\"GABRIEL LEHMANN MENDOZA\",\"tipo_lote\":\"Casa\"},{\"numero\":7,\"propietario\":\""}
+2026-06-18T15:32:52.988719583Z 
+2026-06-18T15:32:52.988722453Z ──────────────────────────────────────────────────
+2026-06-18T15:32:52.988725033Z 
+2026-06-18T15:32:52.988727873Z 💬 [CHUTES Agente (Respuesta Final)]: Aquí está la lista de lotes que son casas con sus propietarios:
+2026-06-18T15:32:52.988730403Z 
+2026-06-18T15:32:52.988747974Z | Número de Lote | Propietario | Tipo |
+2026-06-18T15:32:52.988750934Z |----------------|-------------|------|
+2026-06-18T15:32:52.988753544Z | 2 | GABRIEL LEHMANN MENDOZA | Casa |
+2026-06-18T15:32:52.988756344Z | 7 | (datos incompletos en respuesta) | Casa |
+2026-06-18T15:32:52.988758954Z 
+2026-06-18T15:32:52.988761664Z **Nota:** El sistema encontró **1,252 registros** de lotes tipo casa en total. Por limitaciones de memoria en la consulta, solo se muestran los primeros 100 registros. 
+2026-06-18T15:32:52.988764264Z 
+2026-06-18T15:32:52.988767224Z Si necesitas:
+2026-06-18T15:32:52.988770084Z - Ver más registros específicos (por rango de números de lote)
+2026-06-18T15:32:52.988772864Z - Filtrar por algún criterio particular (letra inicial del propietario, rango de números, etc.)
+2026-06-18T15:32:52.988775744Z - Exportar la lista completa
+2026-06-18T15:32:52.988778284Z 
+2026-06-18T15:32:52.988781034Z Por favor indícamelo para ajustar la consulta según tus necesidades.
+2026-06-18T15:32:52.988783624Z 
+2026-06-18T15:32:52.988786415Z --- Info de la petición Chutes ---
+2026-06-18T15:32:52.988789324Z Tokens Entrada Acumulados: 2636 | Tokens Salida Acumulados: 257
+2026-06-18T15:32:52.988792425Z ───────────────────────────
+2026-06-18T15:32:52.988795355Z [CHUTES] Query de rag, TokIn+: 2636, TokOut+: 257
+2026-06-18T15:32:52.988798215Z ✅ Memoria guardada (2 puntos) para proyecto 'EBANO'.
+2026-06-18T15:32:52.988800895Z INFO:     156.67.78.158:0 - "POST /devaiAgent2 HTTP/1.1" 200 OK
+2026-06-18T15:32:53.910258443Z --Conectando Gemini
+2026-06-18T15:32:53.910288724Z modelo en generate: models/gemini-3.1-flash-lite
+2026-06-18T15:32:53.910292913Z --- Info de la petición ---
+2026-06-18T15:32:53.910295744Z Tokens Entrada: 75 | Tokens Salida: 7
+2026-06-18T15:32:53.910298864Z ───────────────────────────
+2026-06-18T15:32:53.910302294Z INFO:     156.67.78.158:0 - "POST /prompt HTTP/1.1" 200 OK

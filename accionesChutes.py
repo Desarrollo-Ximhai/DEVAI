@@ -148,8 +148,10 @@ def generate_response_chutes(prompt: str, model_name: str, api_key: str, archivo
                     print(f"⚙️  [PYTHON EJECUTÓ]: '{func_name}'")
                     print(f"   ↳ 📥 Datos devueltos al LLM con éxito.\n")
                     
-                    content_str = function_response if isinstance(function_response, str) else json.dumps(function_response, ensure_ascii=False)
-                    
+                    content_str = function_response if isinstance(function_response, str) else json.dumps(function_response, ensure_ascii=False)                    
+    
+                    print(f"   ↳ 📄 [CONTENIDO ENVIADO]: {content_str}\n")
+
                     messages.append({
                         "role": "tool",
                         "tool_call_id": func_id,

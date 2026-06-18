@@ -38,15 +38,15 @@ def rerank_con_langsearch( query_usuario, candidatos, top_n=10):
             "Authorization": f"Bearer {RERANK_KEY}", 
             "Content-Type": "application/json"
         }
+        print('documentos reranker')
+        print(candidatos)
 
         # Extraemos solo las cadenas de texto limpias de los candidatos de Qdrant
         documentos = [
             c.payload.get("text", "") if hasattr(c, "payload") else c.get("text", "")
             for c in candidatos
         ]
-        print('documentos reranker')
-        print(documentos)
-
+       
         payload = {
             "model": "langsearch-reranker-v1",
             "query": query_usuario,

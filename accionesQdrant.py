@@ -28,6 +28,8 @@ def rerank_con_langsearch( query_usuario, candidatos, top_n=10):
         RERANK_KEY= os.environ.get('RERANK_KEY') 
         RERANK_URL= os.environ.get('RERANK_URL') 
 
+        print(RERANK_KEY)
+        print(RERANK_URL)
         if not candidatos:
             return []
 
@@ -42,6 +44,8 @@ def rerank_con_langsearch( query_usuario, candidatos, top_n=10):
             c.payload.get("text", "") if hasattr(c, "payload") else c.get("text", "")
             for c in candidatos
         ]
+        print('documentos reranker')
+        print(documentos)
 
         payload = {
             "model": "langsearch-reranker-v1",

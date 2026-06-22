@@ -72,7 +72,7 @@ def rerank_con_langsearch( query_usuario, candidatos, top_n=15):
             "return_documents": True,
         }
 
-        print(documentos)
+        print(documents)
         
         response = requests.post(url, headers=headers, data=json.dumps(data))
 

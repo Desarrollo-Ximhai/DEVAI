@@ -28,8 +28,6 @@ def rerank_con_langsearch( query_usuario, candidatos, top_n=15):
         RERANK_KEY= os.environ.get('RERANK_KEY') 
         RERANK_URL= os.environ.get('RERANK_URL') 
 
-        print(RERANK_KEY)
-        print(RERANK_URL)
         if not candidatos:
             return []
 
@@ -38,8 +36,6 @@ def rerank_con_langsearch( query_usuario, candidatos, top_n=15):
             "Authorization": f"Bearer {RERANK_KEY}", 
             "Content-Type": "application/json"
         }
-        print('documentos reranker')
-        #print(candidatos)
 
         # Extraemos solo las cadenas de texto limpias de los candidatos de Qdrant
         documentos = []
@@ -71,7 +67,6 @@ def rerank_con_langsearch( query_usuario, candidatos, top_n=15):
                         "text": text.strip(),
                         "id": str(punto_id)
                     })
-        print(documentos)
         payload = {
             "model": "langsearch-reranker-v1",
             "query": query_usuario,
@@ -110,6 +105,9 @@ def rerank_con_langsearch( query_usuario, candidatos, top_n=15):
                     if candidato_original and candidato_original not in chunks_finales:
                         chunks_finales.append(candidato_original)
             
+            print(len(chunks_finales)) 
+            print(type(chunks_finales)) 
+            print(chunks_finales) 
             return chunks_finales
         
         # 🔍 AQUÍ ESTÁ EL AJUSTE PARA INVESTIGAR EL ERROR 500

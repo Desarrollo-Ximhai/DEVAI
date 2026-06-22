@@ -75,6 +75,8 @@ def rerank_con_langsearch( query_usuario, candidatos, top_n=15):
 
         
         response = requests.post(url, json=payload, headers=headers, timeout=5)
+        print('response)')
+        print(response) 
         if response.status_code == 200:
             res_data = response.json()
             
@@ -103,9 +105,8 @@ def rerank_con_langsearch( query_usuario, candidatos, top_n=15):
                     if candidato_original and candidato_original not in chunks_finales:
                         chunks_finales.append(candidato_original)
             
-            print(len(response)) 
-            print(type(response)) 
-            print(response) 
+           
+            
             return chunks_finales
         
         # 🔍 AQUÍ ESTÁ EL AJUSTE PARA INVESTIGAR EL ERROR 500

@@ -105,9 +105,9 @@ def rerank_con_langsearch( query_usuario, candidatos, top_n=15):
                     if candidato_original and candidato_original not in chunks_finales:
                         chunks_finales.append(candidato_original)
             
-            print(len(chunks_finales)) 
-            print(type(chunks_finales)) 
-            print(chunks_finales) 
+            print(len(response)) 
+            print(type(response)) 
+            print(response) 
             return chunks_finales
         
         # 🔍 AQUÍ ESTÁ EL AJUSTE PARA INVESTIGAR EL ERROR 500

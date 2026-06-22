@@ -76,8 +76,8 @@ def rerank_con_langsearch( query_usuario, candidatos, top_n=15):
         
         response = requests.post(url, headers=headers, data=json.dumps(data))
 
-        print('response)')
-        print(response) 
+        print('response')
+        print(response.json()) 
         if response.status_code == 200:
             res_data = response.json()
             

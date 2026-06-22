@@ -37,45 +37,45 @@ def rerank_con_langsearch( query_usuario, candidatos, top_n=15):
             "Content-Type": "application/json"
         }
 
-        # Extraemos solo las cadenas de texto limpias de los candidatos de Qdrant
-        documentos = []
+        documents = []         # Esta lista de strings planos va para la API de Jina
+        mapeo_documentos = []  # Esta lista guardará el candidato original de Qdrant correspondiente
+
         for c in candidatos:
-            # 1. Extraer el texto y el ID original del punto
             text = c.payload.get("text", "") if hasattr(c, "payload") else c.get("text", "")
-            punto_id = c.id if hasattr(c, "id") else c.get("id", "unknown_id")
             
-            # 2. Si el texto viene con múltiples tablas metidas en el mismo payload
             if "# TABLA:" in text:
                 sub_chunks = text.split("# TABLA:")
-                sub_indice = 0
-                
                 for sub in sub_chunks:
                     texto_limpio = sub.strip()
                     if texto_limpio:
-                        # Reconstruimos el tag '# TABLA:' que se borró en el split
                         tabla_formateada = f"# TABLA: {texto_limpio}"
                         
-                        documentos.append({
-                            "text": tabla_formateada,
-                            "id": f"{punto_id}_{sub_indice}" # Ej: UUID-ORIGINAL_0
-                        })
-                        sub_indice += 1
+                        # Añadimos el texto plano a la lista de Jina
+                        documents.append(tabla_formateada)
+                        # Guardamos la referencia al objeto original de Qdrant en la misma posición
+                        mapeo_documentos.append(c)
             else:
-                # Si el punto ya venía atómico o es otro tipo de contexto
                 if text.strip():
-                    documentos.append({
-                        "text": text.strip(),
-                        "id": str(punto_id)
-                    })
-        payload = {
+                    documents.append(text.strip())
+                    mapeo_documentos.append(c)
+
+        # El payload para tu request a Jina quedaría con:
+        # "documents": documents
+
+
+
+        data = {
+            "model": "jina-reranker-v3",
             "query": query_usuario,
             "top_n": top_n,
-            "documents": documentos
+            "documents": documentos,
+            "return_documents": True,
         }
 
         print(documentos)
         
-        response = requests.post(url, json=payload, headers=headers, timeout=5)
+        response = requests.post(url, headers=headers, data=json.dumps(data))
+
         print('response)')
         print(response) 
         if response.status_code == 200:
@@ -83,31 +83,17 @@ def rerank_con_langsearch( query_usuario, candidatos, top_n=15):
             
             chunks_finales = []
             
-            # 1. Creamos un diccionario para buscar rápido los candidatos originales por su ID de Qdrant
-            #    Ej: {"id_de_qdrant": objeto_candidato}
-            candidatos_by_id = {
-                str(c.id if hasattr(c, "id") else c.get("id")): c 
-                for c in candidatos
-            }
-            
             for hit in res_data.get("results", []):
-                # 2. La API compatible con OpenAI/Chutes te devuelve el "document" o su "id"
-                #    Dependiendo de la API, suele venir en hit["document"]["id"] o hit["id"]
-                doc_id = hit.get("document", {}).get("id") or hit.get("id")
+                idx = hit.get("index")
                 
-                if doc_id:
-                    # 3. Rompemos el ID para quitarle el sufijo '_índice' (ej: "UUID_0" -> "UUID")
-                    qdrant_id = str(doc_id).split("_")[0]
+                # Validamos que el índice sea correcto y esté dentro del rango mapeado
+                if idx is not None and idx < len(mapeo_documentos):
+                    candidato_original = mapeo_documentos[idx]
                     
-                    # 4. Recuperamos el objeto original completo de Qdrant
-                    candidato_original = candidatos_by_id.get(qdrant_id)
-                    
-                    # Evitamos duplicados en 'chunks_finales' por si dos tablas del mismo punto fueron relevantes
+                    # Evitamos duplicados por si dos sub-tablas del mismo punto de Qdrant rankearon alto
                     if candidato_original and candidato_original not in chunks_finales:
                         chunks_finales.append(candidato_original)
-            
-           
-            
+                        
             return chunks_finales
         
         # 🔍 AQUÍ ESTÁ EL AJUSTE PARA INVESTIGAR EL ERROR 500

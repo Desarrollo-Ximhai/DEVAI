@@ -68,10 +68,8 @@ def rerank_con_langsearch( query_usuario, candidatos, top_n=15):
                         "id": str(punto_id)
                     })
         payload = {
-            "model": "langsearch-reranker-v1",
             "query": query_usuario,
             "top_n": top_n,
-            "return_documents": False, # No necesitamos que nos devuelva el texto, solo los índices
             "documents": documentos
         }
 

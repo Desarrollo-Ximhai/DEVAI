@@ -68,7 +68,7 @@ def rerank_con_langsearch( query_usuario, candidatos, top_n=15):
             "model": "jina-reranker-v3",
             "query": query_usuario,
             "top_n": top_n,
-            "documents": documentos,
+            "documents": documents,
             "return_documents": True,
         }
 

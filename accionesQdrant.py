@@ -42,14 +42,36 @@ def rerank_con_langsearch( query_usuario, candidatos, top_n=10):
         #print(candidatos)
 
         # Extraemos solo las cadenas de texto limpias de los candidatos de Qdrant
-        documentos = [
-            c.payload.get("text", "") if hasattr(c, "payload") else c.get("text", "")
-            for c in candidatos
-        ]
-        print(len(documentos))
-        print(type(documentos))
+        documentos = []
+        for c in candidatos:
+            # 1. Extraer el texto y el ID original del punto
+            text = c.payload.get("text", "") if hasattr(c, "payload") else c.get("text", "")
+            punto_id = c.id if hasattr(c, "id") else c.get("id", "unknown_id")
+            
+            # 2. Si el texto viene con múltiples tablas metidas en el mismo payload
+            if "# TABLA:" in text:
+                sub_chunks = text.split("# TABLA:")
+                sub_indice = 0
+                
+                for sub in sub_chunks:
+                    texto_limpio = sub.strip()
+                    if texto_limpio:
+                        # Reconstruimos el tag '# TABLA:' que se borró en el split
+                        tabla_formateada = f"# TABLA: {texto_limpio}"
+                        
+                        documentos.append({
+                            "text": tabla_formateada,
+                            "id": f"{punto_id}_{sub_indice}" # Ej: UUID-ORIGINAL_0
+                        })
+                        sub_indice += 1
+            else:
+                # Si el punto ya venía atómico o es otro tipo de contexto
+                if text.strip():
+                    documentos.append({
+                        "text": text.strip(),
+                        "id": str(punto_id)
+                    })
         print(documentos)
-
         payload = {
             "model": "langsearch-reranker-v1",
             "query": query_usuario,

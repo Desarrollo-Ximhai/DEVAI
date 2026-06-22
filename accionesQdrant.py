@@ -20,7 +20,7 @@ def conectarQdrant( qdrant_url, qdrant_api_key):
             api_key=qdrant_api_key 
         )
         return client
-def rerank_con_langsearch( query_usuario, candidatos, top_n=10):
+def rerank_con_langsearch( query_usuario, candidatos, top_n=15):
         """
         Usa la API de LangSearch para reordenar los chunks de Qdrant.
         Consumo de RAM local = 0 MB.
@@ -86,10 +86,29 @@ def rerank_con_langsearch( query_usuario, candidatos, top_n=10):
             res_data = response.json()
             
             chunks_finales = []
+            
+            # 1. Creamos un diccionario para buscar rápido los candidatos originales por su ID de Qdrant
+            #    Ej: {"id_de_qdrant": objeto_candidato}
+            candidatos_by_id = {
+                str(c.id if hasattr(c, "id") else c.get("id")): c 
+                for c in candidatos
+            }
+            
             for hit in res_data.get("results", []):
-                idx = hit.get("index")
-                if idx is not None and idx < len(candidatos):
-                    chunks_finales.append(candidatos[idx])
+                # 2. La API compatible con OpenAI/Chutes te devuelve el "document" o su "id"
+                #    Dependiendo de la API, suele venir en hit["document"]["id"] o hit["id"]
+                doc_id = hit.get("document", {}).get("id") or hit.get("id")
+                
+                if doc_id:
+                    # 3. Rompemos el ID para quitarle el sufijo '_índice' (ej: "UUID_0" -> "UUID")
+                    qdrant_id = str(doc_id).split("_")[0]
+                    
+                    # 4. Recuperamos el objeto original completo de Qdrant
+                    candidato_original = candidatos_by_id.get(qdrant_id)
+                    
+                    # Evitamos duplicados en 'chunks_finales' por si dos tablas del mismo punto fueron relevantes
+                    if candidato_original and candidato_original not in chunks_finales:
+                        chunks_finales.append(candidato_original)
             
             return chunks_finales
         

@@ -371,37 +371,7 @@ async def devai_endpoint(request: Request):
     return {"response": respuesta}
 
 
-@app.post("/devaiAgent", dependencies=[Depends(verificar_clave)])
-async def devai_endpoint(request: Request):
-    global client
-    global tokens_entrada_acumulados
-    global tokens_salida_acumulados
-    form_data = await request.form()
-    
-    query = form_data.get("query", "")
-    memoria = form_data.get("memoria", "DevAI-Memory")
-    chat_id = int(form_data.get("chat_id", 0))
-    codigo = form_data.get("codigo", "DEVAI-embeddings")
-    bd = form_data.get("basedatos", form_data.get("bd", "DevAI-DB"))
-    archivo = form_data.get("analisis", form_data.get("archivo", "DevAI-Analisis"))
-    proyecto = form_data.get("proyecto", "default")
-    model_name = form_data.get("model_name", "models/gemini-3.1-flash-lite")
-    historial = form_data.get("historial", "")
-    max_tokens = int(form_data.get("max_tokens", 6000))
-
-    archivos_procesados = []
-    for key, value in form_data.items():
-        if key.startswith("files[") and hasattr(value, "filename"):
-            contenido_bytes = await value.read()
-            archivos_procesados.append({
-                "mime_type": value.content_type,   
-                "data": contenido_bytes          
-            })
-
-
-    historialModificado = optimizar_y_aplanar_historial(historial, max_tokens)
-    #query_para_busqueda = decontextualize_query(historialModificado, query)
-    
+def agenteGemini(objTools, query, model_name, archivos, system_instruction,historialModificado):
     historial_gemini = []
     for turno in historialModificado:
         # Gemini exige 'model' en lugar de 'assistant'
@@ -410,107 +380,18 @@ async def devai_endpoint(request: Request):
             "role": rol_gemini,
             "parts": [turno["content"]]  
         })
-
-
-    system_instruction = """
-        Eres un asistente de desarrollo extremadamente preciso y especializado en interpretar código PHP, HTML y SQL dentro de un framework personalizado.
-
-        Tu objetivo es resolver las consultas del usuario utilizando de forma proactiva las herramientas (Tools) a tu disposición para consultar la base de datos de conocimiento, esquemas, análisis y código fuente real.
-
-        REGLAS CRÍTICAS DE OPERACIÓN:
-        1. **Veracidad Estricta:** No inventes, asumas, ni completes nada que no esté explícitamente en la información recuperada por tus herramientas. Si la información no está ahí, no existe para ti.
-        2. **Insuficiencia de Información:** Si tras ejecutar tus herramientas consideras que no hay suficiente información para responder con certeza, detén tu análisis y responde claramente que no es posible contestar, detallando con precisión qué dato o fragmento te hace falta.
-        3. **Privacidad del Contexto:** No menciones de qué fragmento de código, tabla exacta o tool provino la información. No digas cosas como "según el chunk recuperado...". Simplemente asimila el conocimiento y responde formalmente.
-        4. **Reglas del Framework (Interfaz/Vistas):** Al analizar o generar código de vistas, NO inventes inputs ni etiquetas HTML estándar, a menos que se te pida. Utiliza siempre la clase 'Ximhai' o los ejemplos de código reales obtenidos mediante tus herramientas para guiar la estructura.
-
-        REGLAS DE FORMATO Y RESPUESTA:
-        - Responde de forma concreta, profesional y directa al grano.
-        - No repitas estas instrucciones del sistema ni hagas resúmenes innecesarios de todo lo que encontraste.
-        - No generes estructuras de código incompletas o "falsas".
-        - Todo código fuente generado o citado debe ir estrictamente encasillado dentro de bloques de marcado triple: ```.
-        """ 
-
-    objQdrant = Qdrant(
-        client=client,
-        collection=bd,
-        proyecto=proyecto
-    )
-    objMemoria = Qdrant(
-        client=client,
-        collection=memoria,
-        proyecto=proyecto
-    )
-    #query_enriquecida = f"Consulta original del usuario: <QueryOriginal> {queryOriginal} </QueryOriginal>. Consulta enriquecida: <EnrichedQuery>{query_para_busqueda}</EnrichedQuery> "
-    objTools = AgenteTools(objQdrant=objQdrant)
     lista_tools = [objTools.buscar_conocimiento_base_datos, objTools.ejecutar_consulta_php]
     response = generate_response(
         prompt=query,
         model_name=model_name,
+        archivos=archivos,
         tools=lista_tools,
         system_instruction=system_instruction,
         history=historial_gemini
         )
-        
-    # memory = objMemoria.getProjectMemory(
-    #         embed_fn=embed_with_gemini,
-    #         user_query=user_query,
-    #         collection_memory=memoria,
-    #         chat_id=chat_id,
-    #         proyecto=proyecto,
-    #         limit=4
-    #     )
-        
+    return response
 
-    tokens_entrada_acumulados += response["tokens_entrada"]
-    tokens_salida_acumulados += response["tokens_salida"]
-    response_text = response["texto"].strip()
-    debug(f"Query de rag, TokIn+: {tokens_entrada_acumulados}, TokOut+: {tokens_salida_acumulados}")
-
-    uuids = objMemoria.save_to_qdrant(
-        embed_fn=embed_with_gemini,
-        user_query=query,
-        collection_memory=memoria,
-        respuesta=response_text,
-        chat_id=chat_id,
-        proyecto=proyecto
-    )
-    respuesta = {'response': response_text, 'uuids' : uuids, 'tokens_entrada' : tokens_entrada_acumulados, 'tokens_salida': tokens_salida_acumulados}, 200
-    return {"response": respuesta}
-
-# Implementacion con chutes, para poder usar deepseek, qwen y zai
-@app.post("/devaiAgent2", dependencies=[Depends(verificar_clave)])
-async def devai_endpoint(request: Request):
-    global client  # Tu cliente Qdrant o Chutes global si aplica
-    global tokens_entrada_acumulados
-    global tokens_salida_acumulados
-    
-    form_data = await request.form()
-    
-    query = form_data.get("query", "")
-    memoria = form_data.get("memoria", "DevAI-Memory")
-    chat_id = int(form_data.get("chat_id", 0))
-    codigo = form_data.get("codigo", "DEVAI-embeddings")
-    bd = form_data.get("basedatos", form_data.get("bd", "DevAI-DB"))
-    archivo = form_data.get("analisis", form_data.get("archivo", "DevAI-Analisis"))
-    proyecto = form_data.get("proyecto", "default")
-    
-    # IMPORTANTE: Asegúrate de mandar el nombre correcto del modelo en Chutes (ej: "chutes/deepseek-ai/DeepSeek-V3")
-    model_name = form_data.get("model_name", "chutes/deepseek-ai/DeepSeek-V3") 
-    historial = form_data.get("historial", "")
-    max_tokens = int(form_data.get("max_tokens", 6000))
-
-    archivos_procesados = []
-    for key, value in form_data.items():
-        if key.startswith("files[") and hasattr(value, "filename"):
-            contenido_bytes = await value.read()
-            archivos_procesados.append({
-                "mime_type": value.content_type,   
-                "data": contenido_bytes          
-            })
-
-    historialModificado = optimizar_y_aplanar_historial(historial, max_tokens)
-    
-    # 1. MAPEO DE HISTORIAL AL ESTÁNDAR OPENAI/CHUTES
+def agenteChutes(historialModificado, objTools, query, model_name, archivos_procesados, system_instruction):
     historial_chutes = []
     for turno in historialModificado:
         rol_chutes = "assistant" if turno["role"] == "assistant" else "user"
@@ -519,40 +400,6 @@ async def devai_endpoint(request: Request):
             "content": turno["content"]  # En OpenAI es directo string, sin el "parts" de Gemini
         })
 
-    system_instruction = """
-        Eres un asistente de desarrollo extremadamente preciso y especializado en interpretar código PHP, HTML y SQL dentro de un framework personalizado.
-
-        Tu objetivo es resolver las consultas del usuario utilizando de forma proactiva las herramientas (Tools) a tu disposición para consultar la base de datos de conocimiento, esquemas, análisis y código fuente real.
-
-        REGLAS CRÍTICAS DE OPERACIÓN:
-        1. **Veracidad Estricta:** No inventes, asumas, ni completes nada que no esté explícitamente en la información recuperada por tus herramientas. Si la información no está ahí, no existe para ti.
-        2. **Insuficiencia de Información:** Si tras ejecutar tus herramientas consideras que no hay suficiente información para responder con certeza, detén tu análisis y responde claramente que no es posible contestar, detallando con precisión qué dato o fragmento te hace falta.
-        3. **Privacidad del Contexto:** No menciones de qué fragmento de código, tabla exacta o tool provino la información. No digas cosas como "según el chunk recuperado...". Simplemente asimila el conocimiento y responde formalmente.
-        4. **Reglas del Framework (Interfaz/Vistas):** Al analizar o generar código de vistas, NO inventes inputs ni etiquetas HTML estándar, a menos que se te pida. Utiliza siempre la clase 'Ximhai' o los ejemplos de código reales obtenidos mediante tus herramientas para guiar la estructura.
-        5. **Eficiencia SQL Estricta (PROHIBIDO BUCLES N+1):** Cuando uses la herramienta 'ejecutar_consulta_php', está TERMINANTEMENTE PROHIBIDO realizar múltiples consultas consecutivas o individuales para procesar listas de elementos. Si necesitas datos de varios registros o validar una lista, debes estructurar UNA SOLA CONSULTA limpia utilizando operadores como 'IN', 'BETWEEN' o agrupaciones mediante 'INNER JOIN'. Maximiza la eficiencia y minimiza las llamadas al servidor.
-
-        REGLAS DE FORMATO Y RESPUESTA:
-        - Responde de forma concreta, profesional y directa al grano.
-        - No repitas estas instrucciones del sistema ni hagas resúmenes innecesarios de todo lo que encontraste.
-        - No generes estructuras de código incompletas o "falsas".
-        - Todo código fuente generado o citado debe ir estrictamente encasillado dentro de bloques de marcado triple: ```.
-        """ 
-
-    objQdrant = Qdrant(
-        client=client,  # Cliente de Qdrant asignado en tu main
-        collection=bd,
-        proyecto=proyecto
-    )
-    objMemoria = Qdrant(
-        client=client,
-        collection=memoria,
-        proyecto=proyecto
-    )
-    
-    objTools = AgenteTools(objQdrant=objQdrant)
-    
-    # 2. DEFINICIÓN DE SCHEMAS EN FORMATO OPENAI PARA LAS TOOLS
-    # Como la función de Chutes recibe JSON schema estructurado, se los declaramos explícitamente:
     tools_schemas = [
         {
             "type": "function",
@@ -590,17 +437,10 @@ async def devai_endpoint(request: Request):
         }
     ]
 
-    # Diccionario de mapeo asociativo para que el loop sepa qué ejecutar dinámicamente
     tool_functions = {
         "buscar_conocimiento_base_datos": objTools.buscar_conocimiento_base_datos,
         "ejecutar_consulta_php": objTools.ejecutar_consulta_php
     }
-
-    # 3. LLAMADA AL NUEVO GENERADOR DE CHUTES (Loop ReAct manual)
-    #model_name = "zai-org/GLM-5.1-TEE"
-    #model_name = "moonshotai/Kimi-K2.5-TEE"
-    #model_name = "deepseek-ai/DeepSeek-V3.2-TEE"
-    model_name = "Qwen/Qwen3.5-397B-A17B-TEE"
     response = generate_response_chutes(
         prompt=query,
         model_name=model_name,
@@ -611,18 +451,96 @@ async def devai_endpoint(request: Request):
         system_instruction=system_instruction,
         history=historial_chutes
     )
-        
     if response.get("status") == "error":
         # Manejo de error limpio si falla la API de Chutes
         return {"response": {"error": response["texto"]}}
+    return response
 
-    tokens_entrada_acumulados += response["tokens_entrada"]
-    tokens_salida_acumulados += response["tokens_salida"]
-    response_text = response["texto"].strip()
+# Implementacion con chutes, para poder usar deepseek, qwen y zai
+@app.post("/devaiAgent", dependencies=[Depends(verificar_clave)])
+async def devai_endpoint(request: Request):
+    global client  
+    global tokens_entrada_acumulados
+    global tokens_salida_acumulados
     
-    debug(f"[CHUTES] Query de rag, TokIn+: {tokens_entrada_acumulados}, TokOut+: {tokens_salida_acumulados}")
+    default_system_instruction = """
+        Eres un asistente de desarrollo extremadamente preciso y especializado en interpretar código PHP, HTML y SQL dentro de un framework personalizado.
 
-    # Guardado seguro en la memoria de Qdrant (puedes seguir usando embed_with_gemini o cambiar a uno open-source)
+        Tu objetivo es resolver las consultas del usuario utilizando de forma proactiva las herramientas (Tools) a tu disposición para consultar la base de datos de conocimiento, esquemas, análisis y código fuente real.
+
+        REGLAS CRÍTICAS DE OPERACIÓN:
+        1. **Veracidad Estricta:** No inventes, asumas, ni completes nada que no esté explícitamente en la información recuperada por tus herramientas. Si la información no está ahí, no existe para ti.
+        2. **Insuficiencia de Información:** Si tras ejecutar tus herramientas consideras que no hay suficiente información para responder con certeza, detén tu análisis y responde claramente que no es posible contestar, detallando con precisión qué dato o fragmento te hace falta.
+        3. **Privacidad del Contexto:** No menciones de qué fragmento de código, tabla exacta o tool provino la información. No digas cosas como "según el chunk recuperado...". Simplemente asimila el conocimiento y responde formalmente.
+        4. **Reglas del Framework (Interfaz/Vistas):** Al analizar o generar código de vistas, NO inventes inputs ni etiquetas HTML estándar, a menos que se te pida. Utiliza siempre la clase 'Ximhai' o los ejemplos de código reales obtenidos mediante tus herramientas para guiar la estructura.
+        5. **Eficiencia SQL Estricta (PROHIBIDO BUCLES N+1):** Cuando uses la herramienta 'ejecutar_consulta_php', está TERMINANTEMENTE PROHIBIDO realizar múltiples consultas consecutivas o individuales para procesar listas de elementos. Si necesitas datos de varios registros o validar una lista, debes estructurar UNA SOLA CONSULTA limpia utilizando operadores como 'IN', 'BETWEEN' o agrupaciones mediante 'INNER JOIN'. Maximiza la eficiencia y minimiza las llamadas al servidor.
+
+        REGLAS DE FORMATO Y RESPUESTA:
+        - Responde de forma concreta, profesional y directa al grano.
+        - No repitas estas instrucciones del sistema ni hagas resúmenes innecesarios de todo lo que encontraste.
+        - No generes estructuras de código incompletas o "falsas".
+        - Todo código fuente generado o citado debe ir estrictamente encasillado dentro de bloques de marcado triple: ```.
+        """ 
+
+    #Primero, los datos del request. Todos con sus propios defaults
+    form_data = await request.form()
+    query = form_data.get("query", "")
+    memoria = form_data.get("memoria", "DevAI-Memory")
+    chat_id = int(form_data.get("chat_id", 0))
+    codigo = form_data.get("codigo", "DEVAI-embeddings")
+    bd = form_data.get("basedatos", form_data.get("bd", "DevAI-DB"))
+    archivo = form_data.get("analisis", form_data.get("archivo", "DevAI-Analisis"))
+    proyecto = form_data.get("proyecto", "default")
+    proveedor = form_data.get("proveedor", "gemini")
+    system_instruction = form_data.get("system_instruction", default_system_instruction)
+    
+    model_name = form_data.get("model_name", "models/gemini-3.1-flash-lite") 
+    historial = form_data.get("historial", "")
+    max_tokens = int(form_data.get("max_tokens", 6000))
+
+    #Por si vienen archivos
+    archivos_procesados = []
+    for key, value in form_data.items():
+        if key.startswith("files[") and hasattr(value, "filename"):
+            contenido_bytes = await value.read()
+            archivos_procesados.append({
+                "mime_type": value.content_type,   
+                "data": contenido_bytes          
+            })
+    #El historial lo aplanamos al numero de tokens que traemos por defecto
+    historialModificado = optimizar_y_aplanar_historial(historial, max_tokens)
+
+    #Objetos de Qdrant para pasarselos a las tools. Aqui, faltaria el objeto para la base de codigo, porque faltan las tools para eso.
+    objQdrant = Qdrant(
+        client=client,  
+        collection=bd,
+        proyecto=proyecto
+    )
+    objMemoria = Qdrant(
+        client=client,
+        collection=memoria,
+        proyecto=proyecto
+    )
+    
+    #Objeto de tools, ya con el objeto de Qdrant para el tema de la collection. Aqui hay que ver que onda, una vez que tengamos el de codigo
+    objTools = AgenteTools(objQdrant=objQdrant)
+    
+    print(f"Proveedor: {proveedor} ")
+    print(f"query: {query} ")
+    print(f"model_name: {model_name} ")
+  
+    if(proveedor == 'gemini'):
+        respuesta = agenteGemini(objTools, query, model_name, archivos_procesados, system_instruction,historialModificado)
+    else:
+        respuesta = agenteChutes(historialModificado, objTools, query, model_name, archivos_procesados, system_instruction)
+
+    tokens_entrada_acumulados += respuesta["tokens_entrada"]
+    tokens_salida_acumulados += respuesta["tokens_salida"]
+    response_text = respuesta["texto"].strip()
+    
+    debug(f" TOKENS en Agentic , TokIn+: {tokens_entrada_acumulados}, TokOut+: {tokens_salida_acumulados}")
+
+    # Guardado en la memoria de Qdrant 
     uuids = objMemoria.save_to_qdrant(
         embed_fn=embed_with_gemini,
         user_query=query,
@@ -630,9 +548,8 @@ async def devai_endpoint(request: Request):
         respuesta=response_text,
         chat_id=chat_id,
         proyecto=proyecto
-    )
+    )    
     
-    # Estructuramos la respuesta JSON final limpia
     respuesta_final = {
         "response": response_text, 
         "uuids": uuids, 

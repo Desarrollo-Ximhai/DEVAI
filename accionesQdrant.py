@@ -23,7 +23,7 @@ def conectarQdrant( qdrant_url, qdrant_api_key):
         )
         return client
 
-def rerank( query_usuario, candidatos, top_n=15):
+def rerank( query_usuario, candidatos, top_n):
         
         RERANK_KEY= os.environ.get('RERANK_KEY') 
         RERANK_URL= os.environ.get('RERANK_URL') 
@@ -59,11 +59,6 @@ def rerank( query_usuario, candidatos, top_n=15):
                     documents.append(text.strip())
                     mapeo_documentos.append(c)
 
-        # El payload para tu request a Jina quedaría con:
-        # "documents": documents
-
-
-
         data = {
             "model": "jina-reranker-v3",
             "query": query_usuario,
@@ -72,12 +67,12 @@ def rerank( query_usuario, candidatos, top_n=15):
             "return_documents": True,
         }
 
-        debug(documents)
+        # debug(documents)
         
         response = requests.post(url, headers=headers, data=json.dumps(data))
 
-        debug('response')
-        debug(response.json()) 
+        # debug('response')
+        # debug(response.json()) 
         if response.status_code == 200:
             res_data = response.json()
             
@@ -148,23 +143,7 @@ class Qdrant:
         )
         return resultado
 
-
-    
-
-
-    #Busqueda anterior, solo era sobre los vectores, ahora lo hacemos tambien de manera dispersa(palabras clave)
-    # def search_in_qdrant(client, collection_name, query_embedding, k=5):
-    #     results = client.query_points(
-    #         collection_name=collection_name,
-    #         query=query_embedding,
-    #         limit=k,
-    #         )
-
-    #     return results.points 
-
-
-
-    def search_in_qdrant(self, user_query, query_embedding, k):
+    def search_in_qdrant(self, user_query, query_embedding, k, top_n):
         global sparse_model
         filtros = []
 
@@ -199,7 +178,7 @@ class Qdrant:
         debug(f"Busqueda en qdrant con k:{k}" )
 
         #Reranking
-        return rerank(user_query, results.points, 10) 
+        return rerank(user_query, results.points, top_n) 
 
     def save_to_qdrant(self, embed_fn, user_query, collection_memory, respuesta, chat_id, proyecto="default"):
         

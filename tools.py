@@ -36,7 +36,7 @@ class AgenteTools:
             return {'error': 'Failed to generate embedding 768 for query'}, 500
 
 
-        puntos_ganadores = self.ObjQdrant.search_in_qdrant(user_query=query, query_embedding=query_embedding768, k=40)
+        puntos_ganadores = self.ObjQdrant.search_in_qdrant(user_query=query, query_embedding=query_embedding768, k=40, top_n=10)
         
         # Mapeamos a texto limpio para la IA
         contexto_para_el_agente = []
@@ -61,7 +61,7 @@ class AgenteTools:
         if query_embedding is None:
             return {'error': 'Failed to generate embedding for query'}, 500
 
-        puntos_ganadores = self.ObjQdrant.search_in_qdrant(user_query=query, query_embedding=query_embedding, k=80)
+        puntos_ganadores = self.ObjQdrant.search_in_qdrant(user_query=query, query_embedding=query_embedding, k=40, top_n=15)
         
         # Mapeamos a texto limpio para la IA
         contexto_para_el_agente = []

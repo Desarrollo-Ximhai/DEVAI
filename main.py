@@ -1,31 +1,22 @@
 # -*- coding: utf-8 -*-
-import time
+from datetime import datetime
+import json
 import os
-from funciones import debug
+import time
+from typing import Any, Optional
+import uuid
 
+from fastapi import FastAPI, Request, UploadFile, Depends, HTTPException, Header
+from pydantic import BaseModel
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Filter, FieldCondition, MatchValue, PointStruct
-import uuid
-from datetime import datetime
-from fastapi import FastAPI, Request, UploadFile
-from pydantic import BaseModel
+import tiktoken
 import uvicorn
-from typing import Optional
-import json
 
 from accionesQdrant import Qdrant, conectarQdrant
-#from accionesQdrant import conectarQdrant, borrar_por_chat_id, borrar_por_point_id, search_in_qdrant, save_to_qdrant, getProjectMemory, embebirBaseDatos
 from accionesGemini import conectarGemini, generate_response, embed_with_gemini
 from accionesChutes import  generate_response_chutes
-
-#para la autenticacion de la API
-from fastapi import Depends
-from fastapi import HTTPException, Header
-
-#Para el tokenizador
-from typing import Any, Optional
-import tiktoken
-
+from funciones import debug
 from tools import AgenteTools
 
 ADMIN_KEY = os.environ.get("ADMIN_API_KEY")
@@ -85,7 +76,6 @@ def optimizar_y_aplanar_historial(historial: Any, max_tokens: int):
         
         historial_plano_final = componentes_turno + historial_plano_final
         tokens_acumulados += tokens_turno
-    print(tokens_acumulados)
     return historial_plano_final
 
 
@@ -232,7 +222,6 @@ def decontextualize_query(historial_plano, nueva_pregunta, model_name="models/ge
     return response["texto"].strip()
 
 def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyecto: str = "default", model_name= "models/gemini-3-flash-preview", historial = '', max_tokens = 6000, archivos = None  ):
-    print(model_name)
     global tokens_entrada_acumulados
     global tokens_salida_acumulados
     global client
@@ -366,8 +355,6 @@ async def devai_endpoint(request: Request):
         max_tokens=max_tokens,
         archivos=archivos_procesados
         )
-	#print('respuesta')
-	#print(respuesta)
     return {"response": respuesta}
 
 
@@ -525,9 +512,9 @@ async def devai_endpoint(request: Request):
     #Objeto de tools, ya con el objeto de Qdrant para el tema de la collection. Aqui hay que ver que onda, una vez que tengamos el de codigo
     objTools = AgenteTools(objQdrant=objQdrant)
     
-    print(f"Proveedor: {proveedor} ")
-    print(f"query: {query} ")
-    print(f"model_name: {model_name} ")
+    debug(f"Proveedor: {proveedor} ")
+    debug(f"query: {query} ")
+    debug(f"model_name: {model_name} ")
   
     if(proveedor == 'gemini'):
         respuesta = agenteGemini(objTools, query, model_name, archivos_procesados, system_instruction,historialModificado)
@@ -649,6 +636,4 @@ async def devai_endpoint(request: Request):
             })
     archivo = archivos_procesados[0]
     respuesta =  embebirBaseDatos(client, descripcion, archivo, proyecto)
-	#print('respuesta')
-	#print(respuesta)
     return {"response": respuesta}

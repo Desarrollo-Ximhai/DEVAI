@@ -1,8 +1,10 @@
+import json
+import requests
 
 from accionesGemini import conectarGemini, generate_response, embed_with_gemini
 from accionesQdrant import Qdrant, conectarQdrant
-import json
-import requests
+from funciones import debug
+
 
 # =================================================================
 # Clase para tools de gemini, para poder instanciar desde main
@@ -19,7 +21,7 @@ class AgenteTools:
 # Busqueda en QDRANT
 # =================================================================
     def buscar_conocimiento_base_datos(self, query: str) -> str:
-        print(f"Buscando en base de datos con tool. {query}")
+        debug(f"Buscando en base de datos con tool. {query}")
         """
         Busca esquemas de tablas, descripciones lógicas, relaciones de llaves foráneas 
         y lógica de negocio en la base de datos del proyecto actual.
@@ -60,7 +62,7 @@ class AgenteTools:
         Returns:
             JSON con los registros o string de error.
         """
-        print(f"🚀 [Tool PHP] Ejecutando consulta solicitada por el Agente:\n👉 {sql}\n")
+        debug(f"🚀 [Tool PHP] Ejecutando consulta solicitada por el Agente:\n👉 {sql}\n")
         
         headers = {
             "Authorization": f"Bearer DVyskAc4oLtzP8YrDW",

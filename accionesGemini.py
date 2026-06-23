@@ -1,10 +1,10 @@
-import google.generativeai as genai
 import json 
+import google.generativeai as genai
 
 from funciones import debug
 
 def conectarGemini(key):
-    print("--Conectando Gemini")
+    debug("--Conectando Gemini")
     genai.configure(api_key=key)
 
 
@@ -19,25 +19,8 @@ def embed_with_gemini(text, dimension=3072, tipo="retrieval_document"):
     )
     return res["embedding"] if "embedding" in res else None
 
-# def generate_response(prompt, model_name="models/gemini-3.1-flash-lite", archivos: list = None):
-#     print('modelo en generate')
-#     print(model_name)
-#     chat_model = genai.GenerativeModel(model_name)
-#     contenidos_payload = [prompt]
-#     if archivos:
-#         for arc in archivos:
-#             contenidos_payload.append({
-#                 "mime_type": arc["mime_type"],
-#                 "data": arc["data"]
-#             })
-#     convo = chat_model.start_chat()
-#     response = convo.send_message(contenidos_payload)
-#     payload_total_tokens = contenidos_payload + [response.text]
-#     tokens = chat_model.count_tokens(payload_total_tokens)
-#     return response.text
-
-def generate_response(prompt, model_name="models/gemini-3.1-flash-lite", archivos: list = None, configuracion = None, tools: list = None, system_instruction=None, history:list = None):
-    print('modelo en generate:', model_name)
+def generate_response(prompt, model_name, archivos: list = None, configuracion = None, tools: list = None, system_instruction=None, history:list = None):
+    debug('modelo en generate:', model_name)
     
     gen_config = {}
 
@@ -59,7 +42,7 @@ def generate_response(prompt, model_name="models/gemini-3.1-flash-lite", archivo
 
     # 🤖 MODO AGENTE: Si hay herramientas, usamos 'start_chat' para ejecución automática
     if tools:
-        print("🤖 [INFO] Modo Agente activado. Orquestando llamadas automáticas...")
+        debug("🤖 [INFO] Modo Agente activado. Orquestando llamadas automáticas...")
 
         # system_instruction = """
         # Eres DEVAI, un asistente experto en ingeniería de datos.
@@ -75,34 +58,34 @@ def generate_response(prompt, model_name="models/gemini-3.1-flash-lite", archivo
         response = chat.send_message(contenidos_payload, generation_config=gen_config if gen_config else None)
         
         # 🔍 IMPRIMIR EL RAZONAMIENTO Y PASOS INTERMEDIOS DEL LLM
-        print("\n🗺️  [TRAZA DE PASOS Y RAZONAMIENTO DEL AGENTE]")
-        print("──────────────────────────────────────────────────")
+        debug("\n🗺️  [TRAZA DE PASOS Y RAZONAMIENTO DEL AGENTE]")
+        debug("──────────────────────────────────────────────────")
         for mensaje in chat.history:
             for part in mensaje.parts:
                 part_dict = type(part).to_dict(part) if hasattr(type(part), 'to_dict') else {}
                 # Pasó 1: ¿El LLM decidió que necesitaba usar una herramienta?
                 if 'function_call' in part_dict:
-                    print(f"🧠 [LLM PENSÓ]: Necesito extraer datos del sistema.")
-                    print(f"   ↳ 🛠️  Llamando a: '{part.function_call.name}'")
+                    debug(f"🧠 [LLM PENSÓ]: Necesito extraer datos del sistema.")
+                    debug(f"   ↳ 🛠️  Llamando a: '{part.function_call.name}'")
                     args = dict(part.function_call.args)
-                    print(f"   ↳ 📋 Argumentos calculados: {args}\n")
+                    debug(f"   ↳ 📋 Argumentos calculados: {args}\n")
                 
                 # Paso 2: ¿Es la respuesta que tu código de Python (Qdrant) le inyectó de vuelta?
                 elif 'function_response' in part_dict:
                     nombre_func = part_dict['function_response'].get('name', 'desconocida')
-                    print(f"⚙️  [PYTHON EJECUTÓ]: '{nombre_func}'")
-                    print(f"   ↳ 📥 Datos devueltos a Gemini con éxito.")
-                    print(f"   ↳ (Tu Qdrant ya le entregó el contexto a la IA)\n")
+                    debug(f"⚙️  [PYTHON EJECUTÓ]: '{nombre_func}'")
+                    debug(f"   ↳ 📥 Datos devueltos a Gemini con éxito.")
+                    debug(f"   ↳ (Tu Qdrant ya le entregó el contexto a la IA)\n")
                 
                 # Paso 3: ¿Es texto plano? (Prompt inicial o respuesta final)
                 elif 'text' in part_dict:
                     rol = "USUARIO (Prompt)" if mensaje.role == "user" else "GEMINI (Respuesta Final)"
-                    print(f"💬 [{rol}]: {part.text.strip()}\n")
-        print("──────────────────────────────────────────────────\n")
+                    debug(f"💬 [{rol}]: {part.text.strip()}\n")
+        debug("──────────────────────────────────────────────────\n")
 
         # historial_dict = [type(msg).to_dict(msg) for msg in chat.history]
-        # print("📁 JSON DEL HISTORIAL:")
-        # print(json.dumps(historial_dict, indent=2, ensure_ascii=False))
+        # debug("📁 JSON DEL HISTORIAL:")
+        # debug(json.dumps(historial_dict, indent=2, ensure_ascii=False))
 
     # 📝 MODO NORMAL: Si no hay herramientas, se ejecuta el 'generate_content' clásico
     else:
@@ -120,11 +103,11 @@ def generate_response(prompt, model_name="models/gemini-3.1-flash-lite", archivo
     tokens_entrada = uso_tokens.prompt_token_count
     tokens_salida = uso_tokens.candidates_token_count
     
-    print(f"--- Info de la petición ---")
-    print(f"Tokens Entrada: {tokens_entrada} | Tokens Salida: {tokens_salida}")
-    print(f"───────────────────────────")
-    #print('Respuesta:')
-    #print(response.text)
+    debug(f"--- Info de la petición ---")
+    debug(f"Tokens Entrada: {tokens_entrada} | Tokens Salida: {tokens_salida}")
+    debug(f"───────────────────────────")
+    #debug('Respuesta:')
+    #debug(response.text)
     # # Opción A: Si solo necesitas el texto como antes, dejas esto:
     # return {"response": response.text, tokens_entrada}
     # return response.text

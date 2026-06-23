@@ -1,5 +1,5 @@
-import os
 import json
+import os
 import requests
 from funciones import debug
 
@@ -8,7 +8,7 @@ def generate_response_chutes(prompt: str, model_name: str, api_key: str, archivo
     Genera una respuesta utilizando la API serverless de Chutes.ai mediante peticiones HTTP directas.
     Soporta modo Agente con orquestación manual (Function Calling Loop) y formato multimodal.
     """
-    print('🤖 [CHUTES] Ejecutando modelo:', model_name)
+    debug('🤖 [CHUTES] Ejecutando modelo:', model_name)
     
     url = "https://llm.chutes.ai/v1/chat/completions"
     headers = {
@@ -69,17 +69,17 @@ def generate_response_chutes(prompt: str, model_name: str, api_key: str, archivo
     interaciones_actuales = 0
     max_iterations = 6 
 
-    print("\n🗺️  Historial y messages")
-    print("──────────────────────────────────────────────────")
-    print(messages)
-    print("──────────────────────────────────────────────────")
+    debug("\n🗺️  Historial y messages")
+    debug("──────────────────────────────────────────────────")
+    debug(messages)
+    debug("──────────────────────────────────────────────────")
 
     modo_agente = bool(tools_schemas and tool_functions)
     
     while True:
         interaciones_actuales += 1
         if interaciones_actuales > max_iterations:
-            print(f"🛑 [AGENTE WARN] Se alcanzó el límite de protección de {max_iterations} iteraciones. Forzando cierre.")
+            debug(f"🛑 [AGENTE WARN] Se alcanzó el límite de protección de {max_iterations} iteraciones. Forzando cierre.")
             # Le quitamos las herramientas en la última llamada para obligarlo a responder con lo que ya tiene
             modo_agente = False 
             
@@ -96,7 +96,7 @@ def generate_response_chutes(prompt: str, model_name: str, api_key: str, archivo
         response = requests.post(url, json=body, headers=headers, timeout=60)
         
         if response.status_code != 200:
-            print(f"❌ [CHUTES ERROR {response.status_code}]: {response.text}")
+            debug(f"❌ [CHUTES ERROR {response.status_code}]: {response.text}")
             return {
                 "texto": f"Error en el proveedor Chutes (HTTP {response.status_code})",
                 "tokens_entrada": 0,
@@ -132,8 +132,8 @@ def generate_response_chutes(prompt: str, model_name: str, api_key: str, archivo
         # Verificamos si se invocaron herramientas
         tool_calls = message_obj.get("tool_calls")
         if tool_calls:
-            print("\n🗺️  [TRAZA DE PASOS Y RAZONAMIENTO DEL AGENTE - CHUTES]")
-            print("──────────────────────────────────────────────────")
+            debug("\n🗺️  [TRAZA DE PASOS Y RAZONAMIENTO DEL AGENTE - CHUTES]")
+            debug("──────────────────────────────────────────────────")
             
             for tool_call in tool_calls:
                 func_id = tool_call.get("id")
@@ -141,21 +141,21 @@ def generate_response_chutes(prompt: str, model_name: str, api_key: str, archivo
                 func_name = func_meta.get("name")
                 func_args = json.loads(func_meta.get("arguments", "{}"))
                 
-                print(f"🧠 [LLM PENSÓ]: Requiero extraer datos contextuales.")
-                print(f"   ↳ 🛠️  Llamando a: '{func_name}'")
-                print(f"   ↳ 📋 Argumentos calculados: {func_args}\n")
+                debug(f"🧠 [LLM PENSÓ]: Requiero extraer datos contextuales.")
+                debug(f"   ↳ 🛠️  Llamando a: '{func_name}'")
+                debug(f"   ↳ 📋 Argumentos calculados: {func_args}\n")
                 
                 if func_name in tool_functions:
                     function_to_call = tool_functions[func_name]
                     # Ejecutamos la lógica local (ej: buscar en Qdrant)
                     function_response = function_to_call(**func_args)
                     
-                    print(f"⚙️  [PYTHON EJECUTÓ]: '{func_name}'")
-                    print(f"   ↳ 📥 Datos devueltos al LLM con éxito.\n")
+                    debug(f"⚙️  [PYTHON EJECUTÓ]: '{func_name}'")
+                    debug(f"   ↳ 📥 Datos devueltos al LLM con éxito.\n")
                     
                     content_str = function_response if isinstance(function_response, str) else json.dumps(function_response, ensure_ascii=False)                    
     
-                    print(f"   ↳ 📄 [CONTENIDO ENVIADO]: {content_str}\n")
+                    debug(f"   ↳ 📄 [CONTENIDO ENVIADO]: {content_str}\n")
 
                     messages.append({
                         "role": "tool",
@@ -164,25 +164,25 @@ def generate_response_chutes(prompt: str, model_name: str, api_key: str, archivo
                         "content": content_str
                     })
                 else:
-                    print(f"⚠️ [ERROR]: La función '{func_name}' no se encuentra en el registro.")
+                    debug(f"⚠️ [ERROR]: La función '{func_name}' no se encuentra en el registro.")
                     messages.append({
                         "role": "tool",
                         "tool_call_id": func_id,
                         "name": func_name,
                         "content": '{"error": "Función no registrada en el agente."}'
                     })
-            print("──────────────────────────────────────────────────\n")
+            debug("──────────────────────────────────────────────────\n")
             # Continuamos el bucle "while" para enviar las respuestas de las herramientas a la IA
             continue
         else:
             # La IA no llamó a más herramientas, tenemos la respuesta final del agente
             final_text = message_obj.get("content", "")
-            print(f"💬 [CHUTES Agente (Respuesta Final)]: {final_text.strip()}\n")
+            debug(f"💬 [CHUTES Agente (Respuesta Final)]: {final_text.strip()}\n")
             break
 
-    print(f"--- Info de la petición Chutes ---")
-    print(f"Tokens Entrada Acumulados: {tokens_entrada_total} | Tokens Salida Acumulados: {tokens_salida_total}")
-    print(f"───────────────────────────")
+    debug(f"--- Info de la petición Chutes ---")
+    debug(f"Tokens Entrada Acumulados: {tokens_entrada_total} | Tokens Salida Acumulados: {tokens_salida_total}")
+    debug(f"───────────────────────────")
 
     return {
         "texto": final_text,

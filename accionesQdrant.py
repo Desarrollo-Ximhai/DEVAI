@@ -1,18 +1,20 @@
 # accionesQdrant.py
-import uuid
+from datetime import datetime
+import json
 import os
+import requests
+import re
+import uuid
+
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Filter, FieldCondition, MatchValue, PointStruct, SparseVector, Prefetch, Fusion, FusionQuery
 from qdrant_client.http import models 
-from datetime import datetime
 from fastembed.sparse import SparseTextEmbedding
-from funciones import debug
-sparse_model = SparseTextEmbedding(model_name="Qdrant/bm25")
-import requests
-import re
-import json
 
 from accionesGemini import conectarGemini, generate_response, embed_with_gemini
+from funciones import debug
+
+sparse_model = SparseTextEmbedding(model_name="Qdrant/bm25")
 
 def conectarQdrant( qdrant_url, qdrant_api_key):
         client = QdrantClient(
@@ -20,11 +22,9 @@ def conectarQdrant( qdrant_url, qdrant_api_key):
             api_key=qdrant_api_key 
         )
         return client
-def rerank_con_langsearch( query_usuario, candidatos, top_n=15):
-        """
-        Usa la API de LangSearch para reordenar los chunks de Qdrant.
-        Consumo de RAM local = 0 MB.
-        """
+        
+def rerank( query_usuario, candidatos, top_n=15):
+        
         RERANK_KEY= os.environ.get('RERANK_KEY') 
         RERANK_URL= os.environ.get('RERANK_URL') 
 
@@ -72,12 +72,12 @@ def rerank_con_langsearch( query_usuario, candidatos, top_n=15):
             "return_documents": True,
         }
 
-        print(documents)
+        debug(documents)
         
         response = requests.post(url, headers=headers, data=json.dumps(data))
 
-        print('response')
-        print(response.json()) 
+        debug('response')
+        debug(response.json()) 
         if response.status_code == 200:
             res_data = response.json()
             
@@ -98,16 +98,16 @@ def rerank_con_langsearch( query_usuario, candidatos, top_n=15):
         
         # 🔍 AQUÍ ESTÁ EL AJUSTE PARA INVESTIGAR EL ERROR 500
         else:
-            print(f"⚠️ LangSearch respondió con error {response.status_code}, usando fallback.")
-            print("──────────────────────────────────────────────────")
-            print("🚨 [DETALLE DEL ERROR DE LANGSEARCH]:")
+            debug(f"⚠️ LangSearch respondió con error {response.status_code}, usando fallback.")
+            debug("──────────────────────────────────────────────────")
+            debug("🚨 [DETALLE DEL ERROR DE LANGSEARCH]:")
             try:
                 # Intentamos leer si la API mandó un JSON con el mensaje de error
-                print(response.json())
+                debug(response.json())
             except Exception:
                 # Si no es un JSON, imprimimos el HTML o texto plano crudo que mandó el servidor
-                print(response.text)
-            print("──────────────────────────────────────────────────")
+                debug(response.text)
+            debug("──────────────────────────────────────────────────")
             
             return candidatos[:top_n]
 class Qdrant:
@@ -199,7 +199,7 @@ class Qdrant:
         debug(f"Busqueda en qdrant con k:{k}" )
 
         #Reranking
-        return rerank_con_langsearch(user_query, results.points, 10) 
+        return rerank(user_query, results.points, 10) 
 
     def save_to_qdrant(self, embed_fn, user_query, collection_memory, respuesta, chat_id, proyecto="default"):
         
@@ -231,7 +231,7 @@ class Qdrant:
             )
 
         if not points:
-            print("⚠️ No se generaron embeddings para guardar memoria.")
+            debug("⚠️ No se generaron embeddings para guardar memoria.")
             return
 
         self.client.upsert(
@@ -239,7 +239,7 @@ class Qdrant:
             points=points,
             wait=True
         )
-        print(f"✅ Memoria guardada ({len(points)} puntos) para proyecto '{proyecto}'.")
+        debug(f"✅ Memoria guardada ({len(points)} puntos) para proyecto '{proyecto}'.")
         return uuids
 
 
@@ -346,7 +346,7 @@ class Qdrant:
                 )
             )
         except Exception as e:
-            print(f"[⚠️ ADVERTENCIA] No se pudo borrar o no existían puntos previos: {e}")
+            debug(f"[⚠️ ADVERTENCIA] No se pudo borrar o no existían puntos previos: {e}")
 
         points = []
         
@@ -388,9 +388,9 @@ class Qdrant:
                 wait=True,
                 points=points
             )
-            print(f"✅ Se han subido exitosamente {len(points)} chunks actualizados a la colección '{collection_name}'.")
+            debug(f"✅ Se han subido exitosamente {len(points)} chunks actualizados a la colección '{collection_name}'.")
         except Exception as e:
-            print(f"[ERROR CRÍTICO] al subir los chunks a Qdrant: {e}")
+            debug(f"[ERROR CRÍTICO] al subir los chunks a Qdrant: {e}")
 
 
         return True
@@ -501,7 +501,7 @@ class Qdrant:
 
 
         for table_name, info in tables.items():
-            print(table_name, len(info["relations"]))
+            debug(table_name, len(info["relations"]))
 
         # ---------- 2) Chunks de relaciones ----------
         for table_name, info in tables.items():

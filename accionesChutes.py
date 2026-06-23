@@ -97,12 +97,19 @@ def generate_response_chutes(prompt: str, model_name: str, api_key: str, archivo
         
         if response.status_code != 200:
             debug(f"❌ [CHUTES ERROR {response.status_code}]: {response.text}")
+            debug({
+                "texto": f"Error en el proveedor Chutes (HTTP {response.status_code})",
+                "tokens_entrada": 1,
+                "tokens_salida": 1,
+                "status": "error"
+            })
             return {
                 "texto": f"Error en el proveedor Chutes (HTTP {response.status_code})",
-                "tokens_entrada": 0,
-                "tokens_salida": 0,
+                "tokens_entrada": 1,
+                "tokens_salida": 1,
                 "status": "error"
             }
+            
 
         res_data = response.json()
         choice = res_data["choices"][0]

@@ -275,7 +275,7 @@ async def devai_endpoint(request: Request):
         respuesta = agenteChutes(historialModificado, objTools, objCodigo, query, model_name, archivos_procesados, system_instruction)
 
     if("error" in respuesta):
-        respuesta = {'error': respuesta['error'],  }, 200
+        respuesta = {'error': respuesta['error'],  }
         return {"response": respuesta}
 
     tokens_entrada_acumulados += respuesta["tokens_entrada"]
@@ -299,10 +299,8 @@ async def devai_endpoint(request: Request):
         "uuids": uuids, 
         "tokens_entrada": tokens_entrada_acumulados, 
         "tokens_salida": tokens_salida_acumulados
-    }
-    
-    respuesta = {'response': response_text, 'uuids' : uuids, 'tokens_entrada' : tokens_entrada_acumulados, 'tokens_salida': tokens_salida_acumulados}, 200
-    return {"response": respuesta}
+    }    
+    return {'response': response_text, 'uuids' : uuids, 'tokens_entrada' : tokens_entrada_acumulados, 'tokens_salida': tokens_salida_acumulados}
 
 
 #

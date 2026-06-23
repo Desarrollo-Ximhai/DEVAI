@@ -1,4 +1,5 @@
 import json 
+from google.api_core import exceptions as googleExceptions
 import google.generativeai as genai
 
 from funciones import debug
@@ -44,19 +45,25 @@ def generate_response(prompt, model_name, archivos: list = None, configuracion =
     if tools:
         debug("🤖 [INFO] Modo Agente activado. Orquestando llamadas automáticas...")
 
-        # system_instruction = """
-        # Eres DEVAI, un asistente experto en ingeniería de datos.
-        # CRÍTICO: NO conoces la estructura, tablas, llaves ni columnas de la base de datos actual del usuario. Todo tu conocimiento interno sobre este proyecto es CERO.
-        # Por lo tanto, ante CUALQUIER pregunta del usuario que involucre tablas, dueños, lotes, consultas o lógica de negocio, es OBLIGATORIO que uses primero la herramienta 'buscar_conocimiento_base_datos'.
-        # Está estrictamente prohibido adivinar o inventar nombres de tablas sin haber consultado la herramienta antes.
-        # """
-
-        
-
         chat_model = genai.GenerativeModel(model_name=model_name, tools=tools, system_instruction=system_instruction)
         chat = chat_model.start_chat(history=history, enable_automatic_function_calling=True)
-        response = chat.send_message(contenidos_payload, generation_config=gen_config if gen_config else None)
-        
+
+        try:
+            response = chat.send_message(contenidos_payload, generation_config=gen_config if gen_config else None)
+
+        except googleExceptions.GoogleAPIError as e:
+            # Captura errores oficiales de la API de Google (400, 429, 403, 500, etc.)
+            statusCode = e.code if hasattr(e, "code") else 500
+            errorMessage = e.message if hasattr(e, "message") else str(e)
+            
+            debug(f"❌ [GEMINI ERROR {statusCode}]: {errorMessage}")
+            return {
+                "texto": f"Error en el proveedor Gemini (HTTP {statusCode})",
+                "tokens_entrada": 0,
+                "tokens_salida": 0,
+                "status": "error"
+            }
+
         # 🔍 IMPRIMIR EL RAZONAMIENTO Y PASOS INTERMEDIOS DEL LLM
         debug("\n🗺️  [TRAZA DE PASOS Y RAZONAMIENTO DEL AGENTE]")
         debug("──────────────────────────────────────────────────")
@@ -83,21 +90,25 @@ def generate_response(prompt, model_name, archivos: list = None, configuracion =
                     debug(f"💬 [{rol}]: {part.text.strip()}\n")
         debug("──────────────────────────────────────────────────\n")
 
-        # historial_dict = [type(msg).to_dict(msg) for msg in chat.history]
-        # debug("📁 JSON DEL HISTORIAL:")
-        # debug(json.dumps(historial_dict, indent=2, ensure_ascii=False))
-
     # 📝 MODO NORMAL: Si no hay herramientas, se ejecuta el 'generate_content' clásico
     else:
-        response = chat_model.generate_content(
-            contenidos_payload,
-            generation_config=gen_config if gen_config else None
-        )
-
-    # response = chat_model.generate_content(
-    #     contenidos_payload,
-    #     generation_config=gen_config if gen_config else None
-    #     )
+        try:
+            response = chat_model.generate_content(
+                contenidos_payload,
+                generation_config=gen_config if gen_config else None
+            )
+        except googleExceptions.GoogleAPIError as e:
+            # Captura errores oficiales de la API de Google (400, 429, 403, 500, etc.)
+            statusCode = e.code if hasattr(e, "code") else 500
+            errorMessage = e.message if hasattr(e, "message") else str(e)
+            
+            debug(f"❌ [GEMINI ERROR {statusCode}]: {errorMessage}")
+            return {
+                "texto": f"Error en el proveedor Gemini (HTTP {statusCode})",
+                "tokens_entrada": 0,
+                "tokens_salida": 0,
+                "status": "error"
+            }
     
     uso_tokens = response.usage_metadata
     tokens_entrada = uso_tokens.prompt_token_count
@@ -106,14 +117,10 @@ def generate_response(prompt, model_name, archivos: list = None, configuracion =
     debug(f"--- Info de la petición ---")
     debug(f"Tokens Entrada: {tokens_entrada} | Tokens Salida: {tokens_salida}")
     debug(f"───────────────────────────")
-    #debug('Respuesta:')
-    #debug(response.text)
-    # # Opción A: Si solo necesitas el texto como antes, dejas esto:
-    # return {"response": response.text, tokens_entrada}
-    # return response.text
-    
+
     return {
         "texto": response.text,
         "tokens_entrada": tokens_entrada,
-        "tokens_salida": tokens_salida
+        "tokens_salida": tokens_salida,
+        "status" : "success"
     }

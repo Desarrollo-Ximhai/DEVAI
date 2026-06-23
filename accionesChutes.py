@@ -99,8 +99,8 @@ def generate_response_chutes(prompt: str, model_name: str, api_key: str, archivo
             debug(f"❌ [CHUTES ERROR {response.status_code}]: {response.text}")
             debug({
                 "texto": f"Error en el proveedor Chutes (HTTP {response.status_code})",
-                "tokens_entrada": 1,
-                "tokens_salida": 1,
+                "tokens_entrada": 0,
+                "tokens_salida": 0,
                 "status": "error"
             })
             return {

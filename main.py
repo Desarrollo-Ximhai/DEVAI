@@ -31,10 +31,8 @@ CHUTES_API_KEY= os.environ.get('CHUTES_API_KEY')
 tokens_entrada_acumulados =0
 tokens_salida_acumulados =0
 conectarGemini(GOOGLE_API_KEY)
-# conectarChutes(GOOGLE_API_KEY)
 
 client = conectarQdrant(QDRANT_URL, QDRANT_API_KEY)
-
 
 def optimizar_y_aplanar_historial(historial: Any, max_tokens: int):
     """
@@ -78,286 +76,6 @@ def optimizar_y_aplanar_historial(historial: Any, max_tokens: int):
         tokens_acumulados += tokens_turno
     return historial_plano_final
 
-
-
-
-def build_prompt_from_chunks(chunksCodigo, chunksBD, chunksArchivo, user_query, memory=None, historial = ''):
-
-    def extraer_texto(chunk):
-        if isinstance(chunk, dict):
-            return chunk.get("text", "")  
-        elif hasattr(chunk, "payload") and chunk.payload:
-            return chunk.payload.get("text", "")  
-        return ""
-
-    contextCodigo = "\n\n---\n\n".join([
-        extraer_texto(chunk) for chunk in chunksCodigo if extraer_texto(chunk)
-    ])
-
-    contextBD = "\n\n---\n\n".join([
-        extraer_texto(chunk) for chunk in chunksBD if extraer_texto(chunk)
-    ])
-
-    contextoArchivo = "\n\n---\n\n".join([
-        extraer_texto(chunk) for chunk in chunksArchivo if extraer_texto(chunk)
-    ])
-
-    memoria = ""
-    if memory and len(memory) > 0:
-        memoria = "\n\n".join([
-            f"[{i+1}] {extraer_texto(chunk)}"
-            for i, chunk in enumerate(memory) if extraer_texto(chunk)
-        ])
-
-    memoria_block = ""
-    if memoria:
-        memoria_block = (
-            "[MEMORIA] MEMORIA DE CHATS RELACIONADOS A LA PREGUNTA:\n"
-            + memoria +
-            "\n\n---\n"
-        )
-
-    codigo_block = ""
-    if contextCodigo:
-        codigo_block = (
-            "[CODIGO] CONTEXTO DE CÓDIGO :\n"
-            + contextCodigo +
-            "\n\n---\n"
-        )
-    bd_block = ""
-    if contextBD:
-        bd_block = (
-            "[BD] CONTEXTO DE BASE DE DATOS :\n"
-            + contextBD +
-            "\n\n---\n"
-        )
-
-    archivo_block = ""
-    if contextoArchivo:
-        archivo_block = (
-            "[ANALISIS] CONTEXTO DE ANÁLISIS:\n"
-            + contextoArchivo +
-            "\n\n---\n"
-        )
-
-    prompt = f"""
-Eres un asistente de desarrollo extremadamente preciso y especializado en interpretar código PHP, HTML y SQL dentro de un framework personalizado.
-
-A continuación tienes fragmentos REALES de código fuente del framework ([CODIGO]). No inventes ni completes nada que no esté explícitamente en el texto. No menciones de dónde salió el fragmento. No hagas suposiciones. Si no hay suficiente información para responder con certeza, responde claramente que no es posible responder y da la razón.
-
-INSTRUCCIONES:
-- Usa solo lo que se encuentra en el contexto ([CODIGO], [BD], [ANALISIS]) y en la memoria([MEMORIA], [HISTORIAL]).
-- Si el usuario adjuntó imágenes, diagramas o archivos directamente en la petición actual, analízalos rigurosamente junto con el contexto de código provisto.
-- Responde de forma concreta y profesional.
-- No repitas el prompt ni resumas el contexto.
-- En caso de las vistas no inventes inputs ni etiquetas HTML, utiliza siempre la clase Ximhai o los ejemplos de código([CODIGO]) para extraer datos.
-- No generes estructuras incompletas.
-- El codigo debe ir encasillado dentro de (```)
-
-{memoria_block}
----
-
-{codigo_block}
-
----
-{bd_block}
-
----
-{archivo_block}
-
----
-
----
-[HISTORIAL] HISTORIAL DE CONVERSACIÓN:
-{historial}
-
----
-
-
-PREGUNTA:
-{user_query}
-
----
-
-RESPUESTA:
-"""
-    return prompt.strip()
-
-
-
-
-def decontextualize_query(historial_plano, nueva_pregunta, model_name="models/gemini-3.1-flash-lite"):
-    global tokens_entrada_acumulados
-    global tokens_salida_acumulados
-    """
-    Toma el historial y la pregunta actual, y devuelve una query optimizada para búsqueda vectorial.
-    """
-    # Convertimos el historial plano a un string legible para el modelo de reformulación
-    historial_texto = ""
-    for turno in historial_plano:
-        historial_texto += f"{turno['role'].upper()}: {turno['content']}\n"
-        
-    prompt_reformador = f"""
-        A continuación se muestra una conversación entre un USUARIO y un ASISTENTE, seguida de una NUEVA PREGUNTA del usuario.
-        Tu única tarea es analizar la conversación y reescribir la NUEVA PREGUNTA para que sea una consulta independiente, clara y rica en contexto, ideal para buscar en una base de datos vectorial.
-
-        REGLAS ESTRICTAS:
-        1. Reemplaza pronombres o referencias ambiguas ("eso", "aquello", "la clase", "el error anterior") por los nombres de los conceptos reales mencionados en el historial.
-        2. Si la NUEVA PREGUNTA ya es independiente y no depende del historial, devuélvela EXACTAMENTE igual, sin añadir nada.
-        3. NO respondas la pregunta. NO agregues saludos ni explicaciones. Devuelve SOLO la pregunta reformulada.
-
-        [HISTORIAL DE CONVERSACIÓN]
-        {historial_texto}
-
-        [NUEVA PREGUNTA]
-        {nueva_pregunta}
-
-        QUERY REFORMULADA OPTIMIZADA:
-        """
-    response = generate_response(prompt_reformador, model_name)
-    tokens_entrada_acumulados += response["tokens_entrada"]
-    tokens_salida_acumulados += response["tokens_salida"]
-    texto = response["texto"].strip()
-    debug(f"Query de descontextualizacion, TokIn+: {tokens_entrada_acumulados}, TokOut+: {tokens_salida_acumulados} Entro: {nueva_pregunta}, salió: {texto} ")
-    return response["texto"].strip()
-
-def query_rag(user_query: str, memoria, chat_id:int, codigo, bd, archivo, proyecto: str = "default", model_name= "models/gemini-3-flash-preview", historial = '', max_tokens = 6000, archivos = None  ):
-    global tokens_entrada_acumulados
-    global tokens_salida_acumulados
-    global client
-    try:
-
-        if not user_query:
-            return {'error': 'No se recibió un prompt válido'}, 400
-        if not chat_id:
-            return {'error': 'No se recibió un id de chat válido'}, 400
-
-        historialModificado = optimizar_y_aplanar_historial(historial, max_tokens)
-        query_para_busqueda = decontextualize_query(historialModificado, user_query)
-        user_queryAux = user_query
-        user_query = query_para_busqueda
-
-        query_embedding = embed_with_gemini(user_query, tipo= "retrieval_query" )
-        if query_embedding is None:
-            return {'error': 'Failed to generate embedding for query'}, 500
-
-        query_embedding768 = embed_with_gemini(user_query,768, tipo= "retrieval_query")
-        if query_embedding768 is None:
-            return {'error': 'Failed to generate embedding 768 for query'}, 500
-
-        collection_memory = memoria
-
-        objBD = Qdrant(
-            client=client,
-            collection=bd,
-            proyecto=proyecto
-        )
-        objCodigo = Qdrant(
-            client=client,
-            collection=codigo,
-            proyecto=None
-        )
-        objArchivo = Qdrant(
-            client=client,
-            collection=archivo,
-            proyecto=None
-        )
-
-        objMemoria = Qdrant(
-            client=client,
-            collection=collection_memory,
-            proyecto=proyecto
-        )
-
-        chunksCodigo = objCodigo.search_in_qdrant( user_query, query_embedding, k=25 )
-        chunksBD = objBD.search_in_qdrant(user_query, query_embedding768 , k=40)
-        chunksArchivo = objArchivo.search_in_qdrant(user_query, query_embedding768, k=10)
-
-        memory = objMemoria.getProjectMemory(
-            embed_fn=embed_with_gemini,
-            user_query=user_query,
-            collection_memory=collection_memory,
-            chat_id=chat_id,
-            proyecto=proyecto,
-            limit=4
-        )
-        
-        user_query = user_queryAux
-        prompt = build_prompt_from_chunks(chunksCodigo, chunksBD, chunksArchivo, user_query, memory, historialModificado)
-        debug('_____________________________________________________')
-        debug(prompt)
-        debug('_____________________________________________________')
-        response = generate_response(prompt, model_name, archivos)        
-
-        tokens_entrada_acumulados += response["tokens_entrada"]
-        tokens_salida_acumulados += response["tokens_salida"]
-        response_text = response["texto"].strip()
-        debug(f"Query de rag, TokIn+: {tokens_entrada_acumulados}, TokOut+: {tokens_salida_acumulados}")
-
-        uuids = objMemoria.save_to_qdrant(
-            embed_fn=embed_with_gemini,
-            user_query=user_query,
-            collection_memory=collection_memory,
-            respuesta=response_text,
-            chat_id=chat_id,
-            proyecto=proyecto
-        )
-        return {'response': response_text, 'uuids' : uuids, 'tokens_entrada' : tokens_entrada_acumulados, 'tokens_salida': tokens_salida_acumulados}, 200
-
-    except Exception as e:
-        return {'error': str(e)}, 500
-
-
-app = FastAPI()
-
-@app.get("/health")
-def health():
-    return {
-        "status": "ok"
-    }
-
-@app.post("/devai", dependencies=[Depends(verificar_clave)])
-async def devai_endpoint(request: Request):
-    form_data = await request.form()
-    
-    query = form_data.get("query", "")
-    memoria = form_data.get("memoria", "DevAI-Memory")
-    chat_id = int(form_data.get("chat_id", 0))
-    codigo = form_data.get("codigo", "DEVAI-embeddings")
-    bd = form_data.get("basedatos", form_data.get("bd", "DevAI-DB"))
-    archivo = form_data.get("analisis", form_data.get("archivo", "DevAI-Analisis"))
-    proyecto = form_data.get("proyecto", "default")
-    model_name = form_data.get("model_name", "models/gemini-3.1-flash-lite")
-    historial = form_data.get("historial", "")
-    max_tokens = int(form_data.get("max_tokens", 6000))
-
-    archivos_procesados = []
-    for key, value in form_data.items():
-        if key.startswith("files[") and hasattr(value, "filename"):
-            contenido_bytes = await value.read()
-            archivos_procesados.append({
-                "mime_type": value.content_type,   
-                "data": contenido_bytes          
-            })
-
-    
-
-    respuesta = query_rag(
-		user_query=query,
-		memoria=memoria,
-		chat_id=chat_id,
-		codigo=codigo,
-		bd=bd,
-		archivo=archivo,
-		proyecto=proyecto,
-        model_name=model_name,
-        historial=historial,
-        max_tokens=max_tokens,
-        archivos=archivos_procesados
-        )
-    return {"response": respuesta}
-
-
 def agenteGemini(historialModificado, objTools, objCodigo, query, model_name, archivos, system_instruction):
     historial_gemini = []
     for turno in historialModificado:
@@ -376,6 +94,8 @@ def agenteGemini(historialModificado, objTools, objCodigo, query, model_name, ar
         system_instruction=system_instruction,
         history=historial_gemini
         )
+    if response.get("status") == "error":
+        return {"error": response["texto"]}
     return response
 
 def agenteChutes(historialModificado, objTools, objCodigo, query, model_name, archivos, system_instruction):
@@ -457,9 +177,19 @@ def agenteChutes(historialModificado, objTools, objCodigo, query, model_name, ar
         history=historial_chutes
     )
     if response.get("status") == "error":
-        # Manejo de error limpio si falla la API de Chutes
-        return {"response": {"error": response["texto"]}}
+        return {"error": response["texto"]}
     return response
+
+
+
+
+app = FastAPI()
+
+@app.get("/health")
+def health():
+    return {
+        "status": "ok"
+    }
 
 # Implementacion con chutes, para poder usar deepseek, qwen y zai
 @app.post("/devaiAgent", dependencies=[Depends(verificar_clave)])
@@ -543,6 +273,10 @@ async def devai_endpoint(request: Request):
         respuesta = agenteGemini(historialModificado, objTools, objCodigo, query, model_name, archivos_procesados, system_instruction)
     else:
         respuesta = agenteChutes(historialModificado, objTools, objCodigo, query, model_name, archivos_procesados, system_instruction)
+
+    if("error" in respuesta):
+        respuesta = {'error': respuesta['error'],  }, 200
+        return {"response": respuesta}
 
     tokens_entrada_acumulados += respuesta["tokens_entrada"]
     tokens_salida_acumulados += respuesta["tokens_salida"]

@@ -20,7 +20,7 @@ def embed_with_gemini(text, dimension=3072, tipo="retrieval_document"):
     return res["embedding"] if "embedding" in res else None
 
 def generate_response(prompt, model_name, archivos: list = None, configuracion = None, tools: list = None, system_instruction=None, history:list = None):
-    debug('modelo en generate:', model_name)
+    debug(f"modelo en generate: {model_name}" )
     
     gen_config = {}
 

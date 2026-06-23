@@ -8,7 +8,7 @@ def generate_response_chutes(prompt: str, model_name: str, api_key: str, archivo
     Genera una respuesta utilizando la API serverless de Chutes.ai mediante peticiones HTTP directas.
     Soporta modo Agente con orquestación manual (Function Calling Loop) y formato multimodal.
     """
-    debug('🤖 [CHUTES] Ejecutando modelo:', model_name)
+    debug(f"🤖 [CHUTES] Ejecutando modelo: {model_name} " )
     
     url = "https://llm.chutes.ai/v1/chat/completions"
     headers = {

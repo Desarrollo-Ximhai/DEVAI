@@ -22,7 +22,7 @@ def conectarQdrant( qdrant_url, qdrant_api_key):
             api_key=qdrant_api_key 
         )
         return client
-        
+
 def rerank( query_usuario, candidatos, top_n=15):
         
         RERANK_KEY= os.environ.get('RERANK_KEY') 
@@ -498,10 +498,6 @@ class Qdrant:
                         "ref_table": ref_table,
                         "ref_column": ref_column
                     })
-
-
-        for table_name, info in tables.items():
-            debug(table_name, len(info["relations"]))
 
         # ---------- 2) Chunks de relaciones ----------
         for table_name, info in tables.items():

@@ -46,6 +46,31 @@ class AgenteTools:
             
         return "\n\n---\n\n".join(contexto_para_el_agente)
 
+    def buscar_conocimiento_fragmentos_codigo(self, query: str) -> str:
+        debug(f"🔍 [TOOL] Buscando en el Framework de Código: '{query}'")
+        """
+        Busca fragmentos de código, clases, métodos, controladores y funciones del 
+        framework del proyecto actual para entender cómo programar o interactuar con el sistema.
+        
+        Args:
+            query: Concepto técnico, nombre de clase o funcionalidad a buscar (ej: "cómo hacer un select", "clase ObjAjuste", "conectar BD").
+        Returns:
+            Un string en formato Markdown con las funciones y bloques de código más relevantes del framework.
+        """
+        query_embedding = embed_with_gemini(query, tipo= "retrieval_query")
+        if query_embedding is None:
+            return {'error': 'Failed to generate embedding for query'}, 500
+
+        puntos_ganadores = self.ObjQdrant.search_in_qdrant(user_query=query, query_embedding=query_embedding, k=80)
+        
+        # Mapeamos a texto limpio para la IA
+        contexto_para_el_agente = []
+        for p in puntos_ganadores:
+            texto_chunk = p.payload.get("text", "")
+            contexto_para_el_agente.append(texto_chunk)
+            
+        return "\n\n---\n\n".join(contexto_para_el_agente)
+
 # =================================================================
 # Hacer request a PHP
 # =================================================================

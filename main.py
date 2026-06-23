@@ -358,7 +358,7 @@ async def devai_endpoint(request: Request):
     return {"response": respuesta}
 
 
-def agenteGemini(objTools, query, model_name, archivos, system_instruction,historialModificado):
+def agenteGemini(historialModificado, objTools, objCodigo, query, model_name, archivos, system_instruction):
     historial_gemini = []
     for turno in historialModificado:
         # Gemini exige 'model' en lugar de 'assistant'
@@ -367,7 +367,7 @@ def agenteGemini(objTools, query, model_name, archivos, system_instruction,histo
             "role": rol_gemini,
             "parts": [turno["content"]]  
         })
-    lista_tools = [objTools.buscar_conocimiento_base_datos, objTools.ejecutar_consulta_php]
+    lista_tools = [objTools.buscar_conocimiento_base_datos, objTools.ejecutar_consulta_php, objCodigo.buscar_conocimiento_fragmentos_codigo]
     response = generate_response(
         prompt=query,
         model_name=model_name,
@@ -378,7 +378,7 @@ def agenteGemini(objTools, query, model_name, archivos, system_instruction,histo
         )
     return response
 
-def agenteChutes(historialModificado, objTools, query, model_name, archivos_procesados, system_instruction):
+def agenteChutes(historialModificado, objTools, objCodigo, query, model_name, archivos, system_instruction):
     historial_chutes = []
     for turno in historialModificado:
         rol_chutes = "assistant" if turno["role"] == "assistant" else "user"
@@ -421,18 +421,36 @@ def agenteChutes(historialModificado, objTools, query, model_name, archivos_proc
                     "required": ["sql"]
                 }
             }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "buscar_conocimiento_fragmentos_codigo",
+                "description": "Busca fragmentos de código, clases, métodos y controladores dentro del framework de desarrollo del usuario para entender cómo interactuar o programar con sus sistemas.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Concepto técnico, nombre de clase, método o funcionalidad a buscar en el código (ej: 'cómo usar la clase objAjuste', 'sintaxis de selects en el framework')."
+                        }
+                    },
+                    "required": ["query"]
+                }
+            }
         }
     ]
 
     tool_functions = {
         "buscar_conocimiento_base_datos": objTools.buscar_conocimiento_base_datos,
-        "ejecutar_consulta_php": objTools.ejecutar_consulta_php
+        "ejecutar_consulta_php": objTools.ejecutar_consulta_php,
+        "buscar_conocimiento_fragmentos_codigo": objCodigo.buscar_conocimiento_fragmentos_codigo
     }
     response = generate_response_chutes(
         prompt=query,
         model_name=model_name,
         api_key=CHUTES_API_KEY,
-        archivos=archivos_procesados,
+        archivos=archivos,
         tools_schemas=tools_schemas,
         tool_functions=tool_functions,
         system_instruction=system_instruction,
@@ -508,18 +526,23 @@ async def devai_endpoint(request: Request):
         collection=memoria,
         proyecto=proyecto
     )
-    
+    objQdrantCodigo = Qdrant(
+        client=client,  
+        collection=codigo,
+        proyecto=None
+    )
     #Objeto de tools, ya con el objeto de Qdrant para el tema de la collection. Aqui hay que ver que onda, una vez que tengamos el de codigo
     objTools = AgenteTools(objQdrant=objQdrant)
+    objCodigo = AgenteTools(objQdrant=objQdrantCodigo)
     
     debug(f"Proveedor: {proveedor} ")
     debug(f"query: {query} ")
     debug(f"model_name: {model_name} ")
   
     if(proveedor == 'gemini'):
-        respuesta = agenteGemini(objTools, query, model_name, archivos_procesados, system_instruction,historialModificado)
+        respuesta = agenteGemini(historialModificado, objTools, objCodigo, query, model_name, archivos_procesados, system_instruction)
     else:
-        respuesta = agenteChutes(historialModificado, objTools, query, model_name, archivos_procesados, system_instruction)
+        respuesta = agenteChutes(historialModificado, objTools, objCodigo, query, model_name, archivos_procesados, system_instruction)
 
     tokens_entrada_acumulados += respuesta["tokens_entrada"]
     tokens_salida_acumulados += respuesta["tokens_salida"]

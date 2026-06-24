@@ -24,7 +24,7 @@ def conectarQdrant( qdrant_url, qdrant_api_key):
     )
     return client
 
-async def rerank( query_usuario, candidatos, topN):
+async def rerank( query_usuario, candidatos, top_n):
         
     RERANK_KEY= os.environ.get('RERANK_KEY') 
     RERANK_URL= os.environ.get('RERANK_URL') 
@@ -63,7 +63,7 @@ async def rerank( query_usuario, candidatos, topN):
     data = {
         "model": "jina-reranker-v3",
         "query": query_usuario,
-        "top_n": topN,
+        "top_n": top_n,
         "documents": documents,
         "return_documents": True,
     }
@@ -98,11 +98,11 @@ async def rerank( query_usuario, candidatos, topN):
                     debug(response.json())
                 except Exception:
                     debug(response.text)
-                return candidatos[:topN]
+                return candidatos[:top_n]
                 
         except Exception as e:
             debug(f"🚨 Error en la petición asíncrona de Rerank: {str(e)}")
-            return candidatos[:topN]
+            return candidatos[:top_n]
 
 class Qdrant:
     def __init__(self, client, collection, proyecto):
@@ -139,7 +139,7 @@ class Qdrant:
         )
         return resultado
 
-    async def search_in_qdrant(self, user_query, query_embedding, k, topN):
+    async def search_in_qdrant(self, user_query, query_embedding, k, top_n):
         global sparse_model
         filtros = []
 
@@ -176,7 +176,7 @@ class Qdrant:
         debug(f"Busqueda en qdrant con k:{k}" )
 
         #Reranking
-        return await rerank(user_query, results.points, topN) 
+        return await rerank(user_query, results.points, top_n) 
 
     async def save_to_qdrant(self, embed_fn, user_query, collection_memory, respuesta, chat_id, proyecto="default"):
         

@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import asyncio
 from datetime import datetime
 import json
 import os
@@ -74,7 +75,19 @@ def optimizar_y_aplanar_historial(historial: Any, max_tokens: int):
         tokens_acumulados += tokens_turno
     return historial_plano_final
 
+
+
 async def agenteGemini(historialModificado, objTools, objCodigo, query, model_name, archivos, system_instruction):
+    def bridge_buscar_bd(query: str):
+        # Esto "rompe" el async para que la librería de Google lo acepte
+        return asyncio.run(objTools.buscar_conocimiento_base_datos(query))
+
+    def bridge_ejecutar_php(sql: str):
+        return asyncio.run(objTools.ejecutar_consulta_php(sql))
+
+    def bridge_buscar_codigo(query: str):
+        return asyncio.run(objCodigo.buscar_conocimiento_fragmentos_codigo(query))
+
     historial_gemini = []
     for turno in historialModificado:
         # Gemini exige 'model' en lugar de 'assistant'
@@ -83,7 +96,9 @@ async def agenteGemini(historialModificado, objTools, objCodigo, query, model_na
             "role": rol_gemini,
             "parts": [turno["content"]]  
         })
-    lista_tools = [objTools.buscar_conocimiento_base_datos, objTools.ejecutar_consulta_php, objCodigo.buscar_conocimiento_fragmentos_codigo]
+    #lista_tools = [objTools.buscar_conocimiento_base_datos, objTools.ejecutar_consulta_php, objCodigo.buscar_conocimiento_fragmentos_codigo]
+    lista_tools = [bridge_buscar_bd, bridge_ejecutar_php, bridge_buscar_codigo]
+
     response = await generate_response(
         prompt=query,
         model_name=model_name,

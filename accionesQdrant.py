@@ -1,12 +1,13 @@
 # accionesQdrant.py
+import asyncio
 from datetime import datetime
+import httpx
 import json
 import os
-import requests
 import re
 import uuid
 
-from qdrant_client import QdrantClient
+from qdrant_client import AsyncQdrantClient
 from qdrant_client.http.models import Filter, FieldCondition, MatchValue, PointStruct, SparseVector, Prefetch, Fusion, FusionQuery
 from qdrant_client.http import models 
 from fastembed.sparse import SparseTextEmbedding
@@ -17,104 +18,99 @@ from funciones import debug
 sparse_model = SparseTextEmbedding(model_name="Qdrant/bm25")
 
 def conectarQdrant( qdrant_url, qdrant_api_key):
-        client = QdrantClient(
-            url= qdrant_url,  
-            api_key=qdrant_api_key 
-        )
-        return client
+    client = AsyncQdrantClient(
+        url= qdrant_url,  
+        api_key=qdrant_api_key 
+    )
+    return client
 
-def rerank( query_usuario, candidatos, top_n):
+async def rerank( query_usuario, candidatos, topN):
         
-        RERANK_KEY= os.environ.get('RERANK_KEY') 
-        RERANK_URL= os.environ.get('RERANK_URL') 
+    RERANK_KEY= os.environ.get('RERANK_KEY') 
+    RERANK_URL= os.environ.get('RERANK_URL') 
 
-        if not candidatos:
-            return []
+    if not candidatos:
+        return []
 
-        url = f"{RERANK_URL}"
-        headers = {
-            "Authorization": f"Bearer {RERANK_KEY}", 
-            "Content-Type": "application/json"
-        }
+    url = f"{RERANK_URL}"
+    headers = {
+        "Authorization": f"Bearer {RERANK_KEY}", 
+        "Content-Type": "application/json"
+    }
 
-        documents = []         # Esta lista de strings planos va para la API de Jina
-        mapeo_documentos = []  # Esta lista guardará el candidato original de Qdrant correspondiente
+    documents = []         # Esta lista de strings planos va para la API de Jina
+    mapeo_documentos = []  # Esta lista guardará el candidato original de Qdrant correspondiente
 
-        for c in candidatos:
-            text = c.payload.get("text", "") if hasattr(c, "payload") else c.get("text", "")
-            
-            if "# TABLA:" in text:
-                sub_chunks = text.split("# TABLA:")
-                for sub in sub_chunks:
-                    texto_limpio = sub.strip()
-                    if texto_limpio:
-                        tabla_formateada = f"# TABLA: {texto_limpio}"
-                        
-                        # Añadimos el texto plano a la lista de Jina
-                        documents.append(tabla_formateada)
-                        # Guardamos la referencia al objeto original de Qdrant en la misma posición
-                        mapeo_documentos.append(c)
-            else:
-                if text.strip():
-                    documents.append(text.strip())
-                    mapeo_documentos.append(c)
-
-        data = {
-            "model": "jina-reranker-v3",
-            "query": query_usuario,
-            "top_n": top_n,
-            "documents": documents,
-            "return_documents": True,
-        }
-
-        # debug(documents)
+    for c in candidatos:
+        text = c.payload.get("text", "") if hasattr(c, "payload") else c.get("text", "")
         
-        response = requests.post(url, headers=headers, data=json.dumps(data))
-
-        # debug('response')
-        # debug(response.json()) 
-        if response.status_code == 200:
-            res_data = response.json()
-            
-            chunks_finales = []
-            
-            for hit in res_data.get("results", []):
-                idx = hit.get("index")
-                
-                # Validamos que el índice sea correcto y esté dentro del rango mapeado
-                if idx is not None and idx < len(mapeo_documentos):
-                    candidato_original = mapeo_documentos[idx]
+        if "# TABLA:" in text:
+            sub_chunks = text.split("# TABLA:")
+            for sub in sub_chunks:
+                texto_limpio = sub.strip()
+                if texto_limpio:
+                    tabla_formateada = f"# TABLA: {texto_limpio}"
                     
-                    # Evitamos duplicados por si dos sub-tablas del mismo punto de Qdrant rankearon alto
-                    if candidato_original and candidato_original not in chunks_finales:
-                        chunks_finales.append(candidato_original)
-                        
-            return chunks_finales
-        
-        # 🔍 AQUÍ ESTÁ EL AJUSTE PARA INVESTIGAR EL ERROR 500
+                    # Añadimos el texto plano a la lista de Jina
+                    documents.append(tabla_formateada)
+                    # Guardamos la referencia al objeto original de Qdrant en la misma posición
+                    mapeo_documentos.append(c)
         else:
-            debug(f"⚠️ LangSearch respondió con error {response.status_code}, usando fallback.")
-            debug("──────────────────────────────────────────────────")
-            debug("🚨 [DETALLE DEL ERROR DE LANGSEARCH]:")
-            try:
-                # Intentamos leer si la API mandó un JSON con el mensaje de error
-                debug(response.json())
-            except Exception:
-                # Si no es un JSON, imprimimos el HTML o texto plano crudo que mandó el servidor
-                debug(response.text)
-            debug("──────────────────────────────────────────────────")
+            if text.strip():
+                documents.append(text.strip())
+                mapeo_documentos.append(c)
+
+    data = {
+        "model": "jina-reranker-v3",
+        "query": query_usuario,
+        "top_n": topN,
+        "documents": documents,
+        "return_documents": True,
+    }
+
+    # debug(documents)
+    
+    #response = requests.post(url, headers=headers, data=json.dumps(data)) response vieja sincrona
+
+    # debug('response')
+    # debug(response.json()) 
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(url, headers=headers, data=json.dumps(data), timeout=15.0)
             
-            return candidatos[:top_n]
+            if response.status_code == 200:
+                res_data = response.json()
+                chunks_finales = []
+                
+                for hit in res_data.get("results", []):
+                    idx = hit.get("index")
+                    # Validamos que el índice sea correcto y esté dentro del rango mapeado
+                    if idx is not None and idx < len(mapeo_documentos):
+                        candidato_original = mapeo_documentos[idx]
+                        # Evitamos duplicados por si dos sub-tablas del mismo punto de Qdrant rankearon alto
+                        if candidato_original and candidato_original not in chunks_finales:
+                            chunks_finales.append(candidato_original)
+                            
+                return chunks_finales
+            else:
+                debug(f"⚠️ Reranker respondió con error {response.status_code}, usando fallback.")
+                try:
+                    debug(response.json())
+                except Exception:
+                    debug(response.text)
+                return candidatos[:topN]
+                
+        except Exception as e:
+            debug(f"🚨 Error en la petición asíncrona de Rerank: {str(e)}")
+            return candidatos[:topN]
+
 class Qdrant:
     def __init__(self, client, collection, proyecto):
         self.client = client
         self.collection = collection
         self.proyecto = proyecto
         
-
-    
-
-    def borrar_por_chat_id(self, collection_name: str, chat_id: int):
+    async def borrar_por_chat_id(self, collection_name: str, chat_id: int):
         """
         Borra todos los puntos en una colección que pertenezcan a un chat_id específico.
         """
@@ -127,23 +123,23 @@ class Qdrant:
             ]
         )
         
-        resultado = self.client.delete(
+        resultado = await self.client.delete(
             collection_name=collection_name,
             points_selector=filtro
         )
         return resultado
 
-    def borrar_por_point_id(self, collection_name: str, point_id: str):
+    async def borrar_por_point_id(self, collection_name: str, point_id: str):
         """
         Borra un punto específico de la colección dado su ID único (UUID).
         """
-        resultado = self.client.delete(
+        resultado = await self.client.delete(
             collection_name=collection_name,
             points_selector=[point_id]
         )
         return resultado
 
-    def search_in_qdrant(self, user_query, query_embedding, k, top_n):
+    async def search_in_qdrant(self, user_query, query_embedding, k, topN):
         global sparse_model
         filtros = []
 
@@ -160,7 +156,7 @@ class Qdrant:
             indices=sparse_emb.indices.tolist(),
             values=sparse_emb.values.tolist()
         )
-        results = self.client.query_points(
+        results = await self.client.query_points(
             collection_name=self.collection,
             prefetch=[
                 # Sub-petición 1: Búsqueda Semántica (Densa)
@@ -178,9 +174,9 @@ class Qdrant:
         debug(f"Busqueda en qdrant con k:{k}" )
 
         #Reranking
-        return rerank(user_query, results.points, top_n) 
+        return await rerank(user_query, results.points, topN) 
 
-    def save_to_qdrant(self, embed_fn, user_query, collection_memory, respuesta, chat_id, proyecto="default"):
+    async def save_to_qdrant(self, embed_fn, user_query, collection_memory, respuesta, chat_id, proyecto="default"):
         
         textos = [
             {"role": "user", "text": user_query.strip()},
@@ -190,7 +186,7 @@ class Qdrant:
         points = []
         uuids = []
         for item in textos:
-            emb = embed_fn(item["text"],768)
+            emb = await embed_fn(item["text"],768)
             if emb is None:
                 continue
             unUUUID = uuid.uuid4()
@@ -213,7 +209,7 @@ class Qdrant:
             debug("⚠️ No se generaron embeddings para guardar memoria.")
             return
 
-        self.client.upsert(
+        await self.client.upsert(
             collection_name=collection_memory,
             points=points,
             wait=True
@@ -222,7 +218,7 @@ class Qdrant:
         return uuids
 
 
-    def getProjectMemory(self, embed_fn, user_query, collection_memory, chat_id, proyecto="default", limit=5):
+    async def getProjectMemory(self, embed_fn, user_query, collection_memory, chat_id, proyecto="default", limit=5):
         filtros = [
             FieldCondition(
                 key="role",
@@ -245,8 +241,8 @@ class Qdrant:
                     match=MatchValue(value=chat_id)
                 )
             )
-        query_emb = embed_fn(user_query,768)
-        res = self.client.query_points(
+        query_emb = await embed_fn(user_query,768)
+        res = await self.client.query_points(
             collection_name=collection_memory,
             query=query_emb,
             limit=limit,
@@ -260,7 +256,7 @@ class Qdrant:
 
         return puntos
 
-    def embebirBaseDatos(self, descripcion, archivo, proyecto):
+    async def embebirBaseDatos(self, descripcion, archivo, proyecto):
         GOOGLE_API_KEY= os.environ.get('KEY-FREE') 
         conectarGemini(GOOGLE_API_KEY)
 
@@ -284,7 +280,7 @@ class Qdrant:
         """
 
         
-        respuesta = generate_response(prompt,configuracion={"tipo": "application/json"})
+        respuesta = await generate_response(prompt,configuracion={"tipo": "application/json"})
         diccionario_descripciones = json.loads(respuesta["texto"])
         #return respuesta
         for chunk in chunks_base:
@@ -301,7 +297,7 @@ class Qdrant:
 
         chunks_with_embeddings = []
         for chunk in chunks_de_base_datos:
-            embedding = embed_with_gemini(chunk["text"], 768, "retrieval_document")
+            embedding = await embed_with_gemini(chunk["text"], 768, "retrieval_document")
             chunk_with_embedding = {
                 "text": chunk['text'],
                 "metadata": chunk['metadata'],
@@ -311,7 +307,7 @@ class Qdrant:
 
         collection_name = "DevAI-DB"
         try:
-            self.client.delete(
+            await self.client.delete(
                 collection_name=collection_name,
                 points_selector=models.Filter(
                     should=[
@@ -362,7 +358,7 @@ class Qdrant:
                 )
 
         try:
-            self.client.upsert(
+            await self.client.upsert(
                 collection_name=collection_name,
                 wait=True,
                 points=points

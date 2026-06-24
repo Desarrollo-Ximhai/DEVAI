@@ -17,7 +17,7 @@ from accionesQdrant import Qdrant, conectarQdrant
 from accionesGemini import conectarGemini, generate_response, embed_with_gemini
 from accionesChutes import  generate_response_chutes
 from funciones import debug
-from tools import AgenteTools
+from tools import sqlTools, codigoTools
 
 ADMIN_KEY = os.environ.get("ADMIN_API_KEY")
 def verificar_clave(api_key: str = Header(...)):
@@ -28,11 +28,9 @@ QDRANT_API_KEY = os.environ.get("QDRANT_API_KEY")
 KEY_FREE2 = os.environ.get("GOOGLE_API_KEY2") 
 GOOGLE_API_KEY= os.environ.get('KEY-FREE') 
 CHUTES_API_KEY= os.environ.get('CHUTES_API_KEY') 
-tokens_entrada_acumulados =0
-tokens_salida_acumulados =0
+
 conectarGemini(GOOGLE_API_KEY)
 
-client = conectarQdrant(QDRANT_URL, QDRANT_API_KEY)
 
 def optimizar_y_aplanar_historial(historial: Any, max_tokens: int):
     """
@@ -76,7 +74,7 @@ def optimizar_y_aplanar_historial(historial: Any, max_tokens: int):
         tokens_acumulados += tokens_turno
     return historial_plano_final
 
-def agenteGemini(historialModificado, objTools, objCodigo, query, model_name, archivos, system_instruction):
+async def agenteGemini(historialModificado, objTools, objCodigo, query, model_name, archivos, system_instruction):
     historial_gemini = []
     for turno in historialModificado:
         # Gemini exige 'model' en lugar de 'assistant'
@@ -86,7 +84,7 @@ def agenteGemini(historialModificado, objTools, objCodigo, query, model_name, ar
             "parts": [turno["content"]]  
         })
     lista_tools = [objTools.buscar_conocimiento_base_datos, objTools.ejecutar_consulta_php, objCodigo.buscar_conocimiento_fragmentos_codigo]
-    response = generate_response(
+    response = await generate_response(
         prompt=query,
         model_name=model_name,
         archivos=archivos,
@@ -98,7 +96,7 @@ def agenteGemini(historialModificado, objTools, objCodigo, query, model_name, ar
         return {"error": response["texto"]}
     return response
 
-def agenteChutes(historialModificado, objTools, objCodigo, query, model_name, archivos, system_instruction):
+async def agenteChutes(historialModificado, objTools, objCodigo, query, model_name, archivos, system_instruction):
     historial_chutes = []
     for turno in historialModificado:
         rol_chutes = "assistant" if turno["role"] == "assistant" else "user"
@@ -166,7 +164,7 @@ def agenteChutes(historialModificado, objTools, objCodigo, query, model_name, ar
         "ejecutar_consulta_php": objTools.ejecutar_consulta_php,
         "buscar_conocimiento_fragmentos_codigo": objCodigo.buscar_conocimiento_fragmentos_codigo
     }
-    response = generate_response_chutes(
+    response = await generate_response_chutes(
         prompt=query,
         model_name=model_name,
         api_key=CHUTES_API_KEY,
@@ -191,12 +189,12 @@ def health():
         "status": "ok"
     }
 
-# Implementacion con chutes, para poder usar deepseek, qwen y zai
 @app.post("/devaiAgent", dependencies=[Depends(verificar_clave)])
 async def devai_endpoint(request: Request):
-    global client  
-    global tokens_entrada_acumulados
-    global tokens_salida_acumulados
+    client = conectarQdrant(QDRANT_URL, QDRANT_API_KEY)
+
+    tokens_entrada_acumulados = 0
+    tokens_salida_acumulados = 0
     
     default_system_instruction = """
         Eres un asistente de desarrollo extremadamente preciso y especializado en interpretar código PHP, HTML y SQL dentro de un framework personalizado.
@@ -261,21 +259,21 @@ async def devai_endpoint(request: Request):
         collection=codigo,
         proyecto=None
     )
-    #Objeto de tools, ya con el objeto de Qdrant para el tema de la collection. Aqui hay que ver que onda, una vez que tengamos el de codigo
-    objTools = AgenteTools(objQdrant=objQdrant)
-    objCodigo = AgenteTools(objQdrant=objQdrantCodigo)
+    #Objetos de tools, ya con el objeto de Qdrant para el tema de la collection.
+    objTools = sqlTools(objQdrant=objQdrant)
+    objCodigo = codigoTools(objQdrant=objQdrantCodigo)
     
     debug(f"Proveedor: {proveedor} ")
     debug(f"query: {query} ")
     debug(f"model_name: {model_name} ")
   
     if(proveedor == 'gemini'):
-        respuesta = agenteGemini(historialModificado, objTools, objCodigo, query, model_name, archivos_procesados, system_instruction)
+        respuesta = await agenteGemini(historialModificado, objTools, objCodigo, query, model_name, archivos_procesados, system_instruction)
     else:
-        respuesta = agenteChutes(historialModificado, objTools, objCodigo, query, model_name, archivos_procesados, system_instruction)
+        respuesta = await agenteChutes(historialModificado, objTools, objCodigo, query, model_name, archivos_procesados, system_instruction)
 
     if("error" in respuesta):
-        respuesta = {'error': respuesta['error'],  }
+        respuesta = {'error': respuesta['error']  }
         return {"response": respuesta}
 
     tokens_entrada_acumulados += respuesta["tokens_entrada"]
@@ -285,7 +283,7 @@ async def devai_endpoint(request: Request):
     debug(f" TOKENS en Agentic , TokIn+: {tokens_entrada_acumulados}, TokOut+: {tokens_salida_acumulados}")
 
     # Guardado en la memoria de Qdrant 
-    uuids = objMemoria.save_to_qdrant(
+    uuids = await objMemoria.save_to_qdrant(
         embed_fn=embed_with_gemini,
         user_query=query,
         collection_memory=memoria,
@@ -299,8 +297,9 @@ async def devai_endpoint(request: Request):
         "uuids": uuids, 
         "tokens_entrada": tokens_entrada_acumulados, 
         "tokens_salida": tokens_salida_acumulados
-    }    
-    return {'response': response_text, 'uuids' : uuids, 'tokens_entrada' : tokens_entrada_acumulados, 'tokens_salida': tokens_salida_acumulados}
+    }
+    return respuesta_final    
+    #return {'response': response_text, 'uuids' : uuids, 'tokens_entrada' : tokens_entrada_acumulados, 'tokens_salida': tokens_salida_acumulados}
 
 
 #
@@ -313,20 +312,19 @@ class FreePromptRequest(BaseModel):
     model_name: str 
 
 @app.post("/prompt", dependencies=[Depends(verificar_clave)])
-def free_prompt_endpoint(request: FreePromptRequest):
-    global tokens_entrada_acumulados
-    global tokens_salida_acumulados
+async def free_prompt_endpoint(request: FreePromptRequest):
     conectarGemini(KEY_FREE2)
     try:
         if not request.prompt:
-            return {"error": "No se recibió un prompt válido"}, 400
+            respuesta = {'error': "No se recibió un prompt válido"  }
+            return {"response": respuesta}
         if not request.model_name:
-            return {"error": "No se recibió un modelo válido"}, 400        
+            respuesta = {'error': "No se recibió un modelo válido"  }
+            return {"response": respuesta}
 
-        response = generate_response(request.prompt, request.model_name)
-        
-        tokens_entrada_acumulados += response["tokens_entrada"]
-        tokens_salida_acumulados += response["tokens_salida"]
+
+        response = await generate_response(request.prompt, request.model_name)
+
         response = response["texto"].strip()
         
         return {"response": response}
@@ -347,20 +345,21 @@ class BorrarPuntoRequest(BaseModel):
     point_id: str
 
 @app.post("/borrar_chat", dependencies=[Depends(verificar_clave)])
-def endpoint_borrar_chat(request: BorrarChatRequest):
-    global client
+async def endpoint_borrar_chat(request: BorrarChatRequest):
+    client = conectarQdrant(QDRANT_URL, QDRANT_API_KEY)
     """Endpoint para borrar todo el historial de un chat por ID."""
     try:
-        res = borrar_por_chat_id(client, request.collection_name, request.chat_id)
+        res = await borrar_por_chat_id(client, request.collection_name, request.chat_id)
         return {"status": "success", "result": res.status}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
 @app.post("/borrar_punto", dependencies=[Depends(verificar_clave)])
-def endpoint_borrar_punto(request: BorrarPuntoRequest):
+async def endpoint_borrar_punto(request: BorrarPuntoRequest):
+    client = conectarQdrant(QDRANT_URL, QDRANT_API_KEY)
     """Endpoint para borrar un único punto por su ID."""
     try:
-        res = borrar_por_point_id(client, request.collection_name, request.point_id)
+        res = await borrar_por_point_id(client, request.collection_name, request.point_id)
         return {"status": "success", "result": res.status}
     except Exception as e:
         return {"status": "error", "message": str(e)}
@@ -390,5 +389,5 @@ async def devai_endpoint(request: Request):
                 "filename": value.filename
             })
     archivo = archivos_procesados[0]
-    respuesta =  embebirBaseDatos(client, descripcion, archivo, proyecto)
+    respuesta =  await embebirBaseDatos(client, descripcion, archivo, proyecto)
     return {"response": respuesta}

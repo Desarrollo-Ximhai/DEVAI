@@ -9,8 +9,8 @@ def conectarGemini(key):
     genai.configure(api_key=key)
 
 
-def embed_with_gemini(text, dimension=3072, tipo="retrieval_document"):
-    res = genai.embed_content(
+async def embed_with_gemini(text, dimension=3072, tipo="retrieval_document"):
+    res = await genai.embed_content_async(
         model='models/gemini-embedding-001',
         content=text,
         task_type=tipo,
@@ -20,7 +20,7 @@ def embed_with_gemini(text, dimension=3072, tipo="retrieval_document"):
     )
     return res["embedding"] if "embedding" in res else None
 
-def generate_response(prompt, model_name, archivos: list = None, configuracion = None, tools: list = None, system_instruction=None, history:list = None):
+async def generate_response(prompt, model_name, archivos: list = None, configuracion = None, tools: list = None, system_instruction=None, history:list = None):
     debug(f"modelo en generate: {model_name}" )
     
     gen_config = {}
@@ -49,7 +49,7 @@ def generate_response(prompt, model_name, archivos: list = None, configuracion =
         chat = chat_model.start_chat(history=history, enable_automatic_function_calling=True)
 
         try:
-            response = chat.send_message(contenidos_payload, generation_config=gen_config if gen_config else None)
+            response = await chat.send_message_async(contenidos_payload, generation_config=gen_config if gen_config else None)
 
         except googleExceptions.GoogleAPIError as e:
             # Captura errores oficiales de la API de Google (400, 429, 403, 500, etc.)
@@ -93,7 +93,7 @@ def generate_response(prompt, model_name, archivos: list = None, configuracion =
     # 📝 MODO NORMAL: Si no hay herramientas, se ejecuta el 'generate_content' clásico
     else:
         try:
-            response = chat_model.generate_content(
+            response = await chat_model.generate_content_async(
                 contenidos_payload,
                 generation_config=gen_config if gen_config else None
             )

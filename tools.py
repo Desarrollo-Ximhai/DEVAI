@@ -1,15 +1,16 @@
+import asyncio
+import httpx
 import json
-import requests
 
-from accionesGemini import conectarGemini, generate_response, embed_with_gemini
+from accionesGemini import embed_with_gemini
 from accionesQdrant import Qdrant, conectarQdrant
 from funciones import debug
 
 
 # =================================================================
-# Clase para tools de gemini, para poder instanciar desde main
+# Clase para tools de base de datos, para poder instanciar desde main
 # =================================================================
-class AgenteTools:
+class sqlTools:
     def __init__(self, objQdrant: Qdrant):
         """
         Recibe el motor de Qdrant ya configurado con el proyecto 
@@ -20,7 +21,7 @@ class AgenteTools:
 # =================================================================
 # Busqueda en QDRANT
 # =================================================================
-    def buscar_conocimiento_base_datos(self, query: str) -> str:
+    async def buscar_conocimiento_base_datos(self, query: str) -> str:
         debug(f"Buscando en base de datos con tool. {query}")
         """
         Busca esquemas de tablas, descripciones lógicas, relaciones de llaves foráneas 
@@ -31,37 +32,12 @@ class AgenteTools:
         Returns:
             Un string en formato Markdown con las tablas y descripciones más relevantes encontradas.
         """
-        query_embedding768 = embed_with_gemini(query,768, tipo= "retrieval_query")
+        query_embedding768 = await embed_with_gemini(query,768, tipo= "retrieval_query")
         if query_embedding768 is None:
             return {'error': 'Failed to generate embedding 768 for query'}, 500
 
 
-        puntos_ganadores = self.ObjQdrant.search_in_qdrant(user_query=query, query_embedding=query_embedding768, k=40, top_n=10)
-        
-        # Mapeamos a texto limpio para la IA
-        contexto_para_el_agente = []
-        for p in puntos_ganadores:
-            texto_chunk = p.payload.get("text", "")
-            contexto_para_el_agente.append(texto_chunk)
-            
-        return "\n\n---\n\n".join(contexto_para_el_agente)
-
-    def buscar_conocimiento_fragmentos_codigo(self, query: str) -> str:
-        debug(f"🔍 [TOOL] Buscando en el Framework de Código: '{query}'")
-        """
-        Busca fragmentos de código, clases, métodos, controladores y funciones del 
-        framework del proyecto actual para entender cómo programar o interactuar con el sistema.
-        
-        Args:
-            query: Concepto técnico, nombre de clase o funcionalidad a buscar (ej: "cómo hacer un select", "clase ObjAjuste", "conectar BD").
-        Returns:
-            Un string en formato Markdown con las funciones y bloques de código más relevantes del framework.
-        """
-        query_embedding = embed_with_gemini(query, tipo= "retrieval_query")
-        if query_embedding is None:
-            return {'error': 'Failed to generate embedding for query'}, 500
-
-        puntos_ganadores = self.ObjQdrant.search_in_qdrant(user_query=query, query_embedding=query_embedding, k=40, top_n=15)
+        puntos_ganadores = await self.ObjQdrant.search_in_qdrant(user_query=query, query_embedding=query_embedding768, k=40, top_n=10)
         
         # Mapeamos a texto limpio para la IA
         contexto_para_el_agente = []
@@ -74,7 +50,7 @@ class AgenteTools:
 # =================================================================
 # Hacer request a PHP
 # =================================================================
-    def ejecutar_consulta_php(self, sql: str) -> str:
+    async def ejecutar_consulta_php(self, sql: str) -> str:
         """
         Ejecuta exclusivamente sentencias SQL de tipo SELECT para recuperar datos reales de las filas.
         
@@ -97,8 +73,9 @@ class AgenteTools:
         
         try:
             # Añadimos un timeout estricto para que el agente no se quede colgado si PHP tarda
-            #response = requests.post(self.PHP_API_URL, json=payload, headers=headers, timeout=15)
-            response = requests.post('https://ebano.ximhai.com/pruebaApi.php', json=payload, headers=headers, timeout=15)
+            async with httpx.AsyncClient() as client:
+                #response = requests.post('https://ebano.ximhai.com/pruebaApi.php', json=payload, headers=headers, timeout=15)
+                response = await client.post('https://ebano.ximhai.com/pruebaApi.php', json=payload, headers=headers, timeout=30.0)
             
             # Si PHP responde con códigos HTTP de error (500, 400, etc.)
             if response.status_code != 200:
@@ -122,7 +99,48 @@ class AgenteTools:
                 
             return json.dumps(resultados, ensure_ascii=False)
             
-        except requests.exceptions.Timeout:
+        except httpx.TimeoutException:
             return "ERROR_TIMEOUT: La consulta tardó demasiado en ejecutarse en el servidor PHP. Intenta optimizar los filtros o el LIMIT."
         except Exception as e:
             return f"ERROR_CONEXION: No se pudo comunicar con el endpoint de PHP. Detalle: {str(e)}"
+
+# =================================================================
+# Clase para tools de codigo, para poder instanciar desde main
+# =================================================================
+
+class codigoTools:
+    def __init__(self, objQdrant: Qdrant):
+        """
+        Recibe el motor de Qdrant ya configurado con el proyecto 
+        y la colección de la petición actual.
+        """
+        self.ObjQdrant = objQdrant
+
+    # =================================================================
+    # Busqueda en QDRANT
+    # =================================================================
+
+    async def buscar_conocimiento_fragmentos_codigo(self, query: str) -> str:
+        debug(f"🔍 [TOOL] Buscando en el Framework de Código: '{query}'")
+        """
+        Busca fragmentos de código, clases, métodos, controladores y funciones del 
+        framework del proyecto actual para entender cómo programar o interactuar con el sistema.
+        
+        Args:
+            query: Concepto técnico, nombre de clase o funcionalidad a buscar (ej: "cómo hacer un select", "clase ObjAjuste", "conectar BD").
+        Returns:
+            Un string en formato Markdown con las funciones y bloques de código más relevantes del framework.
+        """
+        query_embedding = await embed_with_gemini(query, tipo= "retrieval_query")
+        if query_embedding is None:
+            return f"Error al generar embedding del query"
+
+        puntos_ganadores = await self.ObjQdrant.search_in_qdrant(user_query=query, query_embedding=query_embedding, k=40, top_n=15)
+        
+        # Mapeamos a texto limpio para la IA
+        contexto_para_el_agente = []
+        for p in puntos_ganadores:
+            texto_chunk = p.payload.get("text", "")
+            contexto_para_el_agente.append(texto_chunk)
+            
+        return "\n\n---\n\n".join(contexto_para_el_agente)

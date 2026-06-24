@@ -151,7 +151,9 @@ class Qdrant:
                 )
             )
         
-        sparse_emb = list(sparse_model.embed(user_query))[0]
+        #sparse_emb = list(sparse_model.embed(user_query))[0]
+        sparse_emb_list = await asyncio.to_thread(lambda: list(sparse_model.embed(user_query)))
+        sparse_emb = sparse_emb_list[0]
         qdrant_sparse_vector = SparseVector(
             indices=sparse_emb.indices.tolist(),
             values=sparse_emb.values.tolist()

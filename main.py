@@ -83,7 +83,10 @@ async def agenteGemini(historialModificado, objTools, objCodigo, query, model_na
             "role": rol_gemini,
             "parts": [turno["content"]]  
         })
-    lista_tools = [objTools.buscar_conocimiento_base_datos, objTools.ejecutar_consulta_php, objCodigo.buscar_conocimiento_fragmentos_codigo]
+    lista_tools = [objTools.buscar_conocimiento_base_datos, objTools.ejecutar_consulta_php]
+    if(objCodigo):
+        lista_tools.append(objCodigo.buscar_conocimiento_fragmentos_codigo)
+
     response = await generate_response(
         prompt=query,
         model_name=model_name,
@@ -140,7 +143,14 @@ async def agenteChutes(historialModificado, objTools, objCodigo, query, model_na
                 }
             }
         },
-        {
+    ]
+    tool_functions = {
+        "buscar_conocimiento_base_datos": objTools.buscar_conocimiento_base_datos,
+        "ejecutar_consulta_php": objTools.ejecutar_consulta_php,
+    }
+
+    if(objCodigo):
+        tools_schemas.append({
             "type": "function",
             "function": {
                 "name": "buscar_conocimiento_fragmentos_codigo",
@@ -156,14 +166,10 @@ async def agenteChutes(historialModificado, objTools, objCodigo, query, model_na
                     "required": ["query"]
                 }
             }
-        }
-    ]
+        })
+        tool_functions["buscar_conocimiento_fragmentos_codigo"] = objCodigo.buscar_conocimiento_fragmentos_codigo
 
-    tool_functions = {
-        "buscar_conocimiento_base_datos": objTools.buscar_conocimiento_base_datos,
-        "ejecutar_consulta_php": objTools.ejecutar_consulta_php,
-        "buscar_conocimiento_fragmentos_codigo": objCodigo.buscar_conocimiento_fragmentos_codigo
-    }
+    
     response = await generate_response_chutes(
         prompt=query,
         model_name=model_name,
@@ -226,6 +232,7 @@ async def devai_endpoint(request: Request):
     proyecto = form_data.get("proyecto", "default")
     proveedor = form_data.get("proveedor", "gemini")
     system_instruction = form_data.get("system_instruction", default_system_instruction)
+    conCodigo = form_data.get("conCodigo", False)
     
     model_name = form_data.get("model_name", "models/gemini-3.1-flash-lite") 
     historial = form_data.get("historial", "")
@@ -254,6 +261,8 @@ async def devai_endpoint(request: Request):
         collection=memoria,
         proyecto=proyecto
     )
+
+
     objQdrantCodigo = Qdrant(
         client=client,  
         collection=codigo,
@@ -263,6 +272,9 @@ async def devai_endpoint(request: Request):
     objTools = sqlTools(objQdrant=objQdrant)
     objCodigo = codigoTools(objQdrant=objQdrantCodigo)
     
+    if(conCodigo == False):
+        objCodigo = None
+
     debug(f"Proveedor: {proveedor} ")
     debug(f"query: {query} ")
     debug(f"model_name: {model_name} ")

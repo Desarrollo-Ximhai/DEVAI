@@ -125,32 +125,42 @@ async def generate_response(prompt, model_name, archivos: list = None, configura
                     debug(f"⚙️  [PYTHON EJECUTÓ]: '{func_name}'")
                     debug(f"   ↳ 📥 Datos devueltos al LLM con éxito.\n")
                     
-                    # Gemini requiere que el campo 'response' sea un Diccionario (Struct de JSON)
-                    if isinstance(function_response, str):
-                        try:
-                            res_dict = json.loads(function_response)
-                        except:
-                            res_dict = {"resultado": function_response}
-                    elif isinstance(function_response, dict):
+                    # 1. Blindaje: Asegurar que el resultado SIEMPRE sea un diccionario (Struct de Protobuf lo requiere)
+                    if isinstance(function_response, dict):
                         res_dict = function_response
+                    elif isinstance(function_response, str):
+                        try:
+                            parsed = json.loads(function_response)
+                            # json.loads puede devolver una lista u otros tipos, validamos:
+                            if isinstance(parsed, dict):
+                                res_dict = parsed
+                            else:
+                                res_dict = {"resultado": parsed}
+                        except Exception:
+                            res_dict = {"resultado": function_response}
                     else:
                         res_dict = {"resultado": str(function_response)}
                     
-                    # Inyectamos la respuesta de la función en el payload que devolveremos
-                    payload_actual.append({
-                        "function_response": {
-                            "name": func_name,
-                            "response": res_dict
-                        }
-                    })
+                    # 🔥 2. LA SOLUCIÓN: Usar las clases nativas de Protobuf en lugar de un diccionario crudo
+                    parte_respuesta = genai.protos.Part(
+                        function_response=genai.protos.FunctionResponse(
+                            name=func_name,
+                            response=res_dict
+                        )
+                    )
+                    
+                    # Inyectamos la respuesta estructurada en el payload
+                    payload_actual.append(parte_respuesta)
                 else:
                     debug(f"⚠️ [ERROR]: La función '{func_name}' no se encuentra en el registro.")
-                    payload_actual.append({
-                        "function_response": {
-                            "name": func_name,
-                            "response": {"error": "Función no registrada en el agente."}
-                        }
-                    })
+                    
+                    parte_error = genai.protos.Part(
+                        function_response=genai.protos.FunctionResponse(
+                            name=func_name,
+                            response={"error": "Función no registrada en el agente."}
+                        )
+                    )
+                    payload_actual.append(parte_error)
                     
             debug("──────────────────────────────────────────────────\n")
             # Continuamos el bucle "while" para que la IA procese 'payload_actual' (las respuestas de Python)

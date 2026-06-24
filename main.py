@@ -74,7 +74,7 @@ def optimizar_y_aplanar_historial(historial: Any, max_tokens: int):
         tokens_acumulados += tokens_turno
     return historial_plano_final
 
-async def agenteGemini(historialModificado, objTools, objCodigo:None, query, model_name, archivos, system_instruction):
+async def agenteGemini(historialModificado, objTools, objCodigo, query, model_name, archivos, system_instruction):
     historial_gemini = []
     for turno in historialModificado:
         # Gemini exige 'model' en lugar de 'assistant'
@@ -83,8 +83,7 @@ async def agenteGemini(historialModificado, objTools, objCodigo:None, query, mod
             "role": rol_gemini,
             "parts": [turno["content"]]  
         })
-    #lista_tools = [objTools.buscar_conocimiento_base_datos, objTools.ejecutar_consulta_php, objCodigo.buscar_conocimiento_fragmentos_codigo]
-    lista_tools = [objTools.buscar_conocimiento_base_datos, objTools.ejecutar_consulta_php]
+    lista_tools = [objTools.buscar_conocimiento_base_datos, objTools.ejecutar_consulta_php, objCodigo.buscar_conocimiento_fragmentos_codigo]
     response = await generate_response(
         prompt=query,
         model_name=model_name,
@@ -97,7 +96,7 @@ async def agenteGemini(historialModificado, objTools, objCodigo:None, query, mod
         return {"error": response["texto"]}
     return response
 
-async def agenteChutes(historialModificado, objTools, objCodigo:None, query, model_name, archivos, system_instruction):
+async def agenteChutes(historialModificado, objTools, objCodigo, query, model_name, archivos, system_instruction):
     historial_chutes = []
     for turno in historialModificado:
         rol_chutes = "assistant" if turno["role"] == "assistant" else "user"
@@ -141,23 +140,23 @@ async def agenteChutes(historialModificado, objTools, objCodigo:None, query, mod
                 }
             }
         },
-        # {
-        #     "type": "function",
-        #     "function": {
-        #         "name": "buscar_conocimiento_fragmentos_codigo",
-        #         "description": "Busca fragmentos de código, clases, métodos y controladores dentro del framework de desarrollo del usuario para entender cómo interactuar o programar con sus sistemas.",
-        #         "parameters": {
-        #             "type": "object",
-        #             "properties": {
-        #                 "query": {
-        #                     "type": "string",
-        #                     "description": "Concepto técnico, nombre de clase, método o funcionalidad a buscar en el código (ej: 'cómo usar la clase objAjuste', 'sintaxis de selects en el framework')."
-        #                 }
-        #             },
-        #             "required": ["query"]
-        #         }
-        #     }
-        # }
+        {
+            "type": "function",
+            "function": {
+                "name": "buscar_conocimiento_fragmentos_codigo",
+                "description": "Busca fragmentos de código, clases, métodos y controladores dentro del framework de desarrollo del usuario para entender cómo interactuar o programar con sus sistemas.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Concepto técnico, nombre de clase, método o funcionalidad a buscar en el código (ej: 'cómo usar la clase objAjuste', 'sintaxis de selects en el framework')."
+                        }
+                    },
+                    "required": ["query"]
+                }
+            }
+        }
     ]
 
     tool_functions = {
@@ -262,16 +261,16 @@ async def devai_endpoint(request: Request):
     )
     #Objetos de tools, ya con el objeto de Qdrant para el tema de la collection.
     objTools = sqlTools(objQdrant=objQdrant)
-    #objCodigo = codigoTools(objQdrant=objQdrantCodigo)
+    objCodigo = codigoTools(objQdrant=objQdrantCodigo)
     
     debug(f"Proveedor: {proveedor} ")
     debug(f"query: {query} ")
     debug(f"model_name: {model_name} ")
   
     if(proveedor == 'gemini'):
-        respuesta = await agenteGemini(historialModificado, objTools, None, query, model_name, archivos_procesados, system_instruction)
+        respuesta = await agenteGemini(historialModificado, objTools, objCodigo, query, model_name, archivos_procesados, system_instruction)
     else:
-        respuesta = await agenteChutes(historialModificado, objTools, None, query, model_name, archivos_procesados, system_instruction)
+        respuesta = await agenteChutes(historialModificado, objTools, objCodigo, query, model_name, archivos_procesados, system_instruction)
 
     if("error" in respuesta):
         respuesta = {'error': respuesta['error']  }

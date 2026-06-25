@@ -21,7 +21,7 @@ async def embed_with_gemini(text, dimension=3072, tipo="retrieval_document"):
     )
     return res["embedding"] if "embedding" in res else None
 
-async def generate_response(prompt, model_name, archivos: list = None, configuracion = None, tools: list = None, system_instruction=None, history:list = None):
+async def generate_response_streaming(prompt, model_name, archivos: list = None, configuracion = None, tools: list = None, system_instruction=None, history:list = None):
     debug(f"modelo en generate: {model_name}")
     
     gen_config = {}
@@ -257,3 +257,40 @@ async def generate_response(prompt, model_name, archivos: list = None, configura
         #     "tokens_salida": tokens_salida,
         #     "status" : "success"
         # }
+
+
+async def generate_response(prompt, model_name):
+    debug(f"modelo en generate: {model_name}")
+
+    chat_model = genai.GenerativeModel(model_name=model_name)
+    contenidos_payload = [prompt]
+    try:
+        response = await chat_model.generate_content_async(
+            contenidos_payload,
+        )
+    except googleExceptions.GoogleAPIError as e:
+        statusCode = e.code if hasattr(e, "code") else 500
+        errorMessage = e.message if hasattr(e, "message") else str(e)
+        
+        debug(f"❌ [GEMINI ERROR {statusCode}]: {errorMessage}")
+        return {
+            "texto": f"Error en el proveedor Gemini (HTTP {statusCode})",
+            "tokens_entrada": 0,
+            "tokens_salida": 0,
+            "status": "error"
+        }
+
+    uso_tokens = response.usage_metadata
+    tokens_entrada = uso_tokens.prompt_token_count
+    tokens_salida = uso_tokens.candidates_token_count
+    
+    debug(f"--- Info de la petición (Modo Normal) ---")
+    debug(f"Tokens Entrada: {tokens_entrada} | Tokens Salida: {tokens_salida}")
+    debug(f"───────────────────────────")
+
+    return {
+        "texto": response.text,
+        "tokens_entrada": tokens_entrada,
+        "tokens_salida": tokens_salida,
+        "status" : "success"
+    }

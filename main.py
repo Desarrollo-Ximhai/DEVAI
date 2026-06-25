@@ -15,7 +15,7 @@ import tiktoken
 import uvicorn
 
 from accionesQdrant import Qdrant, conectarQdrant
-from accionesGemini import conectarGemini, generate_response, embed_with_gemini
+from accionesGemini import conectarGemini, generate_response, generate_response_streaming, embed_with_gemini
 from accionesChutes import  generate_response_chutes
 from funciones import debug
 from tools import sqlTools, codigoTools
@@ -88,7 +88,7 @@ async def agenteGemini(historialModificado, objTools, objCodigo, query, model_na
     if(objCodigo):
         lista_tools.append(objCodigo.buscar_conocimiento_fragmentos_codigo)
 
-    async for paso in generate_response(
+    async for paso in generate_response_streaming(
         prompt=query,
         model_name=model_name,
         archivos=archivos,

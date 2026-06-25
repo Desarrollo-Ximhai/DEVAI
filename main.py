@@ -284,16 +284,16 @@ async def devai_endpoint(request: Request):
         async for chunk in streamingTexto:
             if chunk.get("type") == "error":
                 #debug(f"Error en streaming:" + chunk['content'])
-                yield f"data: {json.dumps({'status': 'error', 'message': chunk['content']}, ensure_ascii=False)}\n\n"
+                yield f"{json.dumps({'error': chunk['content']}, ensure_ascii=False)}\n\n"
                 return
             #CoT
             if chunk.get("type") == "thought":
                 #debug(f"El LLM penso :" + chunk['content'])
-                yield f"data: {json.dumps({'type': 'thought', 'content': chunk['content']}, ensure_ascii=False)}\n\n"
+                yield f"{json.dumps({'type': 'thought', 'content': chunk['content']}, ensure_ascii=False)}\n\n"
 
             elif chunk.get("type") == "token":
                 textoRespuesta += chunk["content"]  # Buffer para guardar posteriormente en Qdrant
-                yield f"data: {json.dumps({'type': 'token', 'content': chunk['content']}, ensure_ascii=False)}\n\n"
+                yield f"{json.dumps({'type': 'token', 'content': chunk['content']}, ensure_ascii=False)}\n\n"
 
             elif chunk.get("type") == "metrics":
                 tokens_entrada_acumulados = chunk["tokens_entrada"]
@@ -304,14 +304,14 @@ async def devai_endpoint(request: Request):
         # Guardado en la memoria de Qdrant  
         uuids = []
         # if textoRespuesta.strip():
-        #     uuids = await objMemoria.save_to_qdrant(
-        #         embed_fn=embed_with_gemini,
-        #         user_query=query,
-        #         collection_memory=memoria,
-        #         respuesta=textoRespuesta.strip(),
-        #         chat_id=chat_id,
-        #         proyecto=proyecto
-        #     )
+        uuids = await objMemoria.save_to_qdrant(
+            embed_fn=embed_with_gemini,
+            user_query=query,
+            collection_memory=memoria,
+            respuesta=textoRespuesta,
+            chat_id=chat_id,
+            proyecto=proyecto
+        )
 
         respuesta_final_metadata = {
             "type": "final_metadata",
@@ -320,10 +320,9 @@ async def devai_endpoint(request: Request):
             "tokens_salida": tokens_salida_acumulados,
             "texto_respuesta" : textoRespuesta
         }
-        yield f"data: {json.dumps(respuesta_final_metadata, ensure_ascii=False)}\n\n"
+        yield f"{json.dumps(respuesta_final_metadata, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(generar_eventos_stream(), media_type="text/event-stream")
-    #return {'response': response_text, 'uuids' : uuids, 'tokens_entrada' : tokens_entrada_acumulados, 'tokens_salida': tokens_salida_acumulados}
 
 
 #

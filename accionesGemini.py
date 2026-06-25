@@ -235,11 +235,17 @@ async def generate_response_streaming(prompt, model_name, archivos: list = None,
             if hasattr(chunk, "usage_metadata") and chunk.usage_metadata:
                 tokens_entrada += chunk.usage_metadata.prompt_token_count
                 tokens_salida += chunk.usage_metadata.candidates_token_count
-            if hasattr(chunk, "text") and chunk.text:
-                yield {
-                    "type": "token", 
-                    "content": chunk.text
-                }
+
+            try:
+                if chunk.text:
+                    yield {
+                        "type": "token", 
+                        "content": chunk.text
+                    }
+            except ValueError:
+                # Se ignora el error de forma segura. Entra aquí en el chunk final
+                # porque solo contiene metadatos de tokens y carece de caracteres.
+                pass
 
         yield {
             "type": "metrics",

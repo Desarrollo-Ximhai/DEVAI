@@ -50,6 +50,7 @@ async def generate_response(prompt, model_name, archivos: list = None, configura
         chat_model = genai.GenerativeModel(model_name=model_name, tools=tools, system_instruction=system_instruction)
         chat = chat_model.start_chat(history=history)
 
+
         # Variables de control para el loop y métricas
         payload_actual = contenidos_payload
         max_iterations = 6
@@ -63,40 +64,65 @@ async def generate_response(prompt, model_name, archivos: list = None, configura
             interaciones_actuales += 1
             if interaciones_actuales > max_iterations:
                 debug(f"🛑 [AGENTE WARN] Se alcanzó el límite de protección de {max_iterations} iteraciones. Forzando cierre.")
-                final_text = "Se ha alcanzado el límite de iteraciones en el razonamiento del agente."
+                yield {
+                    "type": "thought",
+                    "content": "Se ha alcanzado el límite de iteraciones en el razonamiento del agente."
+                }
                 break
 
             try:
                 # Enviamos el payload actual (puede ser el prompt inicial o las respuestas de las tools)
                 response = await chat.send_message_async(
                     payload_actual, 
-                    generation_config=gen_config if gen_config else None
+                    generation_config=gen_config if gen_config else None,
+                    stream=True
                 )
             except googleExceptions.GoogleAPIError as e:
                 statusCode = e.code if hasattr(e, "code") else 500
                 errorMessage = e.message if hasattr(e, "message") else str(e)
                 
                 debug(f"❌ [GEMINI ERROR {statusCode}]: {errorMessage}")
-                return {
-                    "texto": f"Error en el proveedor Gemini (HTTP {statusCode})",
-                    "tokens_entrada": tokens_entrada_total,
-                    "tokens_salida": tokens_salida_total,
-                    "status": "error"
+                yield {
+                    "type": "error",
+                    "content": f"Error en el proveedor Gemini (HTTP {statusCode}): {errorMessage}"
                 }
+                return
 
-            # Acumular tokens por cada ida y vuelta
-            if hasattr(response, "usage_metadata") and response.usage_metadata:
-                tokens_entrada_total += response.usage_metadata.prompt_token_count
-                tokens_salida_total += response.usage_metadata.candidates_token_count
+            has_tool_calls = False
+            function_calls = []
 
-            # Verificamos si Gemini nos pide ejecutar herramientas en esta iteración
-            function_calls = [part.function_call for part in response.parts if hasattr(part, 'function_call') and part.function_call]
+            async for chunk in response:
+                # 📊 CLAVE 3: El conteo de tokens. Gemini expone las métricas en el último chunk de cada stream.
+                # Al usar += las acumulamos correctamente a lo largo de todo el ciclo de ejecución (bucle while).
+                if hasattr(chunk, "usage_metadata") and chunk.usage_metadata:
+                    tokens_entrada_total += chunk.usage_metadata.prompt_token_count
+                    tokens_salida_total += chunk.usage_metadata.candidates_token_count
 
-            if not function_calls:
-                # La IA no llamó a más herramientas, tenemos la respuesta final del agente
-                final_text = response.text
-                debug(f"💬 [GEMINI Agente (Respuesta Final)]: {final_text.strip()}\n")
+                # Evaluamos si el chunk actual trae intenciones de ejecución de herramientas
+                function_calls_chunk = []
+                if hasattr(chunk, "parts") and chunk.parts:
+                    function_calls_chunk = [part.function_call for part in chunk.parts if hasattr(part, 'function_call') and part.function_call]
+
+                if function_calls_chunk:
+                    has_tool_calls = True
+                    for fc in function_calls_chunk:
+                        function_calls.append(fc)
+                        # Notificamos de inmediato al frontend el paso de razonamiento (Chain of Thought)
+                        yield {
+                            "type": "thought", 
+                            "content": f"🧠 Usando la técnica: `{fc.name}`."
+                        }
+
+                # Si el chunk contiene texto y NO se han activado herramientas en esta llamada, es la respuesta definitiva
+                elif hasattr(chunk, "text") and chunk.text and not has_tool_calls:
+                    yield {
+                        "type": "token", 
+                        "content": chunk.text
+                    }
+            
+            if not has_tool_calls:
                 break
+
 
             # Limpiamos el payload para mandar SOLAMENTE las respuestas de las herramientas en la siguiente iteración
             payload_actual = []
@@ -111,7 +137,12 @@ async def generate_response(prompt, model_name, archivos: list = None, configura
                 debug(f"🧠 [LLM PENSÓ]: Requiero extraer datos del sistema.")
                 debug(f"   ↳ 🛠️  Llamando a: '{func_name}'")
                 debug(f"   ↳ 📋 Argumentos calculados: {func_args}\n")
-                
+
+                yield {
+                    "type": "thought", 
+                    "content": f"🧠 Usando la herramienta `{func_name}`."
+                }
+
                 # Gemini usa la lista original de funciones de Python. La buscamos por su atributo __name__
                 function_to_call = next((f for f in tools if f.__name__ == func_name), None)
                 
@@ -124,6 +155,11 @@ async def generate_response(prompt, model_name, archivos: list = None, configura
                         
                     debug(f"⚙️  [PYTHON EJECUTÓ]: '{func_name}'")
                     debug(f"   ↳ 📥 Datos devueltos al LLM con éxito.\n")
+
+                    yield {
+                        "type": "thought", 
+                        "content": f"⚙️ Ejecuté: `{func_name}` con éxito. Viendo datos..."
+                    }
                     
                     # 1. Blindaje: Asegurar que el resultado SIEMPRE sea un diccionario (Struct de Protobuf lo requiere)
                     if isinstance(function_response, dict):
@@ -141,19 +177,19 @@ async def generate_response(prompt, model_name, archivos: list = None, configura
                     else:
                         res_dict = {"resultado": str(function_response)}
                     
-                    # 🔥 2. LA SOLUCIÓN: Usar las clases nativas de Protobuf en lugar de un diccionario crudo
                     parte_respuesta = genai.protos.Part(
                         function_response=genai.protos.FunctionResponse(
                             name=func_name,
                             response=res_dict
                         )
                     )
-                    
-                    # Inyectamos la respuesta estructurada en el payload
                     payload_actual.append(parte_respuesta)
                 else:
                     debug(f"⚠️ [ERROR]: La función '{func_name}' no se encuentra en el registro.")
-                    
+                    yield {
+                        "type": "thought",
+                        "content": f"⚠️ [ERROR]: La función '{func_name}' no se encuentra registrada. Buscando otra opcion..."
+                    }
                     parte_error = genai.protos.Part(
                         function_response=genai.protos.FunctionResponse(
                             name=func_name,
@@ -169,43 +205,55 @@ async def generate_response(prompt, model_name, archivos: list = None, configura
         debug(f"Tokens Entrada Acumulados: {tokens_entrada_total} | Tokens Salida Acumulados: {tokens_salida_total}")
         debug(f"───────────────────────────")
 
-        return {
-            "texto": final_text,
+        yield {
+            "type": "metrics",
             "tokens_entrada": tokens_entrada_total,
-            "tokens_salida": tokens_salida_total,
-            "status": "success"
+            "tokens_salida": tokens_salida_total
         }
-
     # 📝 MODO NORMAL: Si no hay herramientas, se ejecuta el 'generate_content' clásico sin loop
     else:
         try:
             response = await chat_model.generate_content_async(
                 contenidos_payload,
-                generation_config=gen_config if gen_config else None
+                generation_config=gen_config if gen_config else None,
+                stream=True
             )
         except googleExceptions.GoogleAPIError as e:
             statusCode = e.code if hasattr(e, "code") else 500
             errorMessage = e.message if hasattr(e, "message") else str(e)
             
             debug(f"❌ [GEMINI ERROR {statusCode}]: {errorMessage}")
-            return {
-                "texto": f"Error en el proveedor Gemini (HTTP {statusCode})",
-                "tokens_entrada": 0,
-                "tokens_salida": 0,
-                "status": "error"
+            yield {
+                "type": "error",
+                "content": f"Error en el proveedor Gemini (HTTP {statusCode}): {errorMessage}"
             }
-    
-        uso_tokens = response.usage_metadata
-        tokens_entrada = uso_tokens.prompt_token_count
-        tokens_salida = uso_tokens.candidates_token_count
+            return
+
+        tokens_entrada = 0
+        tokens_salida = 0
+        async for chunk in response:
+            if hasattr(chunk, "usage_metadata") and chunk.usage_metadata:
+                tokens_entrada += chunk.usage_metadata.prompt_token_count
+                tokens_salida += chunk.usage_metadata.candidates_token_count
+            if hasattr(chunk, "text") and chunk.text:
+                yield {
+                    "type": "token", 
+                    "content": chunk.text
+                }
+
+        yield {
+            "type": "metrics",
+            "tokens_entrada": tokens_entrada,
+            "tokens_salida": tokens_salida
+        }
         
         debug(f"--- Info de la petición (Modo Normal) ---")
         debug(f"Tokens Entrada: {tokens_entrada} | Tokens Salida: {tokens_salida}")
         debug(f"───────────────────────────")
 
-        return {
-            "texto": response.text,
-            "tokens_entrada": tokens_entrada,
-            "tokens_salida": tokens_salida,
-            "status" : "success"
-        }
+        # return {
+        #     "texto": response.text,
+        #     "tokens_entrada": tokens_entrada,
+        #     "tokens_salida": tokens_salida,
+        #     "status" : "success"
+        # }

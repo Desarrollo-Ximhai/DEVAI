@@ -7,6 +7,7 @@ from typing import Any, Optional
 import uuid
 
 from fastapi import FastAPI, Request, UploadFile, Depends, HTTPException, Header
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Filter, FieldCondition, MatchValue, PointStruct
@@ -87,17 +88,15 @@ async def agenteGemini(historialModificado, objTools, objCodigo, query, model_na
     if(objCodigo):
         lista_tools.append(objCodigo.buscar_conocimiento_fragmentos_codigo)
 
-    response = await generate_response(
+    async for paso in generate_response(
         prompt=query,
         model_name=model_name,
         archivos=archivos,
         tools=lista_tools,
         system_instruction=system_instruction,
-        history=historial_gemini
-        )
-    if response.get("status") == "error":
-        return {"error": response["texto"]}
-    return response
+        history=histainer_gemini
+    ):
+        yield paso
 
 async def agenteChutes(historialModificado, objTools, objCodigo, query, model_name, archivos, system_instruction):
     historial_chutes = []
@@ -169,8 +168,7 @@ async def agenteChutes(historialModificado, objTools, objCodigo, query, model_na
         })
         tool_functions["buscar_conocimiento_fragmentos_codigo"] = objCodigo.buscar_conocimiento_fragmentos_codigo
 
-    
-    response = await generate_response_chutes(
+    async for paso in generate_response_chutes(
         prompt=query,
         model_name=model_name,
         api_key=CHUTES_API_KEY,
@@ -179,18 +177,15 @@ async def agenteChutes(historialModificado, objTools, objCodigo, query, model_na
         tool_functions=tool_functions,
         system_instruction=system_instruction,
         history=historial_chutes
-    )
-    if response.get("status") == "error":
-        return {"error": response["texto"]}
-    return response
-
+    ):
+        yield paso
 
 
 
 app = FastAPI()
 
 @app.get("/health")
-def health():
+async def health():
     return {
         "status": "ok"
     }
@@ -199,9 +194,6 @@ def health():
 async def devai_endpoint(request: Request):
     client = conectarQdrant(QDRANT_URL, QDRANT_API_KEY)
 
-    tokens_entrada_acumulados = 0
-    tokens_salida_acumulados = 0
-    
     default_system_instruction = """
         Eres un asistente de desarrollo extremadamente preciso y especializado en interpretar código PHP, HTML y SQL dentro de un framework personalizado.
 
@@ -250,7 +242,7 @@ async def devai_endpoint(request: Request):
     #El historial lo aplanamos al numero de tokens que traemos por defecto
     historialModificado = optimizar_y_aplanar_historial(historial, max_tokens)
 
-    #Objetos de Qdrant para pasarselos a las tools. Aqui, faltaria el objeto para la base de codigo, porque faltan las tools para eso.
+    #Objetos de Qdrant para pasarselos a las tools. 
     objQdrant = Qdrant(
         client=client,  
         collection=bd,
@@ -279,38 +271,56 @@ async def devai_endpoint(request: Request):
     debug(f"query: {query} ")
     debug(f"model_name: {model_name} ")
   
-    if(proveedor == 'gemini'):
-        respuesta = await agenteGemini(historialModificado, objTools, objCodigo, query, model_name, archivos_procesados, system_instruction)
-    else:
-        respuesta = await agenteChutes(historialModificado, objTools, objCodigo, query, model_name, archivos_procesados, system_instruction)
+    async def generar_eventos_stream():
+        tokens_entrada_acumulados = 0
+        tokens_salida_acumulados = 0
+        textoRespuesta = ""
 
-    if("error" in respuesta):
-        respuesta = {'error': respuesta['error']  }
-        return {"response": respuesta}
+        if(proveedor == 'gemini'):
+            streamingTexto = await agenteGemini(historialModificado, objTools, objCodigo, query, model_name, archivos_procesados, system_instruction)
+        else:
+            streamingTexto = await agenteChutes(historialModificado, objTools, objCodigo, query, model_name, archivos_procesados, system_instruction)
 
-    tokens_entrada_acumulados += respuesta["tokens_entrada"]
-    tokens_salida_acumulados += respuesta["tokens_salida"]
-    response_text = respuesta["texto"].strip()
-    
-    debug(f" TOKENS en Agentic , TokIn+: {tokens_entrada_acumulados}, TokOut+: {tokens_salida_acumulados}")
+        async for chunk in streamingTexto:
+            if chunk.get("type") == "error":
+                #debug(f"Error en streaming:" + chunk['content'])
+                yield f"data: {json.dumps({'status': 'error', 'message': chunk['content']}, ensure_ascii=False)}\n\n"
+                return
+            #CoT
+            if chunk.get("type") == "thought":
+                #debug(f"El LLM penso :" + chunk['content'])
+                yield f"data: {json.dumps({'type': 'thought', 'content': chunk['content']}, ensure_ascii=False)}\n\n"
 
-    # Guardado en la memoria de Qdrant 
-    uuids = await objMemoria.save_to_qdrant(
-        embed_fn=embed_with_gemini,
-        user_query=query,
-        collection_memory=memoria,
-        respuesta=response_text,
-        chat_id=chat_id,
-        proyecto=proyecto
-    )    
-    
-    respuesta_final = {
-        "response": response_text, 
-        "uuids": uuids, 
-        "tokens_entrada": tokens_entrada_acumulados, 
-        "tokens_salida": tokens_salida_acumulados
-    }
-    return respuesta_final    
+            elif chunk.get("type") == "token":
+                textoRespuesta += chunk["content"]  # Buffer para guardar posteriormente en Qdrant
+                yield f"data: {json.dumps({'type': 'token', 'content': chunk['content']}, ensure_ascii=False)}\n\n"
+
+            elif chunk.get("type") == "metrics":
+                tokens_entrada_acumulados = chunk["tokens_entrada"]
+                tokens_salida_acumulados = chunk["tokens_salida"]
+
+        debug(f"Streaming finalizado. Guardando memoria... Chars: {len(response_text)}")
+        debug(f" TOKENS en Agentic , TokIn+: {tokens_entrada_acumulados}, TokOut+: {tokens_salida_acumulados}")
+        # Guardado en la memoria de Qdrant  
+        uuids = []
+        if response_text.strip():
+            uuids = await objMemoria.save_to_qdrant(
+                embed_fn=embed_with_gemini,
+                user_query=query,
+                collection_memory=memoria,
+                respuesta=response_text.strip(),
+                chat_id=chat_id,
+                proyecto=proyecto
+            )
+
+        respuesta_final_metadata = {
+            "type": "final_metadata",
+            "uuids": uuids, 
+            "tokens_entrada": tokens_entrada_acumulados, 
+            "tokens_salida": tokens_salida_acumulados
+        }
+
+    return StreamingResponse(generar_eventos_stream(), media_type="text/event-stream")
     #return {'response': response_text, 'uuids' : uuids, 'tokens_entrada' : tokens_entrada_acumulados, 'tokens_salida': tokens_salida_acumulados}
 
 

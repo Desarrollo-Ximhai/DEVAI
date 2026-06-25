@@ -320,7 +320,7 @@ async def devai_endpoint(request: Request):
             "tokens_salida": tokens_salida_acumulados,
             "texto_respuesta" : textoRespuesta
         }
-    yield f"data: {json.dumps(respuesta_final_metadata, ensure_ascii=False)}\n\n"
+        yield f"data: {json.dumps(respuesta_final_metadata, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(generar_eventos_stream(), media_type="text/event-stream")
     #return {'response': response_text, 'uuids' : uuids, 'tokens_entrada' : tokens_entrada_acumulados, 'tokens_salida': tokens_salida_acumulados}

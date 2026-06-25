@@ -304,14 +304,14 @@ async def devai_endpoint(request: Request):
         # Guardado en la memoria de Qdrant  
         uuids = []
         # if textoRespuesta.strip():
-        uuids = await objMemoria.save_to_qdrant(
-            embed_fn=embed_with_gemini,
-            user_query=query,
-            collection_memory=memoria,
-            respuesta=textoRespuesta,
-            chat_id=chat_id,
-            proyecto=proyecto
-        )
+        # uuids = await objMemoria.save_to_qdrant(
+        #     embed_fn=embed_with_gemini,
+        #     user_query=query,
+        #     collection_memory=memoria,
+        #     respuesta=textoRespuesta,
+        #     chat_id=chat_id,
+        #     proyecto=proyecto
+        # )
 
         respuesta_final_metadata = {
             "type": "final_metadata",

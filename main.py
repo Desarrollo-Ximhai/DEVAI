@@ -303,15 +303,15 @@ async def devai_endpoint(request: Request):
         debug(f" TOKENS en Agentic , TokIn+: {tokens_entrada_acumulados}, TokOut+: {tokens_salida_acumulados}")
         # Guardado en la memoria de Qdrant  
         uuids = []
-        if textoRespuesta.strip():
-            uuids = await objMemoria.save_to_qdrant(
-                embed_fn=embed_with_gemini,
-                user_query=query,
-                collection_memory=memoria,
-                respuesta=textoRespuesta.strip(),
-                chat_id=chat_id,
-                proyecto=proyecto
-            )
+        # if textoRespuesta.strip():
+        #     uuids = await objMemoria.save_to_qdrant(
+        #         embed_fn=embed_with_gemini,
+        #         user_query=query,
+        #         collection_memory=memoria,
+        #         respuesta=textoRespuesta.strip(),
+        #         chat_id=chat_id,
+        #         proyecto=proyecto
+        #     )
 
         respuesta_final_metadata = {
             "type": "final_metadata",

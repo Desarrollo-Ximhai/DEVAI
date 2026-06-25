@@ -94,7 +94,7 @@ async def agenteGemini(historialModificado, objTools, objCodigo, query, model_na
         archivos=archivos,
         tools=lista_tools,
         system_instruction=system_instruction,
-        history=histainer_gemini
+        history=historial_gemini
     ):
         yield paso
 
@@ -277,9 +277,9 @@ async def devai_endpoint(request: Request):
         textoRespuesta = ""
 
         if(proveedor == 'gemini'):
-            streamingTexto = await agenteGemini(historialModificado, objTools, objCodigo, query, model_name, archivos_procesados, system_instruction)
+            streamingTexto = agenteGemini(historialModificado, objTools, objCodigo, query, model_name, archivos_procesados, system_instruction)
         else:
-            streamingTexto = await agenteChutes(historialModificado, objTools, objCodigo, query, model_name, archivos_procesados, system_instruction)
+            streamingTexto = agenteChutes(historialModificado, objTools, objCodigo, query, model_name, archivos_procesados, system_instruction)
 
         async for chunk in streamingTexto:
             if chunk.get("type") == "error":
@@ -299,16 +299,16 @@ async def devai_endpoint(request: Request):
                 tokens_entrada_acumulados = chunk["tokens_entrada"]
                 tokens_salida_acumulados = chunk["tokens_salida"]
 
-        debug(f"Streaming finalizado. Guardando memoria... Chars: {len(response_text)}")
+        debug(f"Streaming finalizado. Guardando memoria... Chars: {len(textoRespuesta)}")
         debug(f" TOKENS en Agentic , TokIn+: {tokens_entrada_acumulados}, TokOut+: {tokens_salida_acumulados}")
         # Guardado en la memoria de Qdrant  
         uuids = []
-        if response_text.strip():
+        if textoRespuesta.strip():
             uuids = await objMemoria.save_to_qdrant(
                 embed_fn=embed_with_gemini,
                 user_query=query,
                 collection_memory=memoria,
-                respuesta=response_text.strip(),
+                respuesta=textoRespuesta.strip(),
                 chat_id=chat_id,
                 proyecto=proyecto
             )

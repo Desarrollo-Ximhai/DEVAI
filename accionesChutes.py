@@ -100,7 +100,7 @@ async def generate_response_chutes_streaming(prompt: str, model_name: str, api_k
                         errorText = await response.aread()
                         debug(f"❌ [CHUTES ERROR {response.status_code}]: {errorText}")
                         yield {
-                            "texto": f"Error en el proveedor Chutes (HTTP {response.status_code})",
+                            "content": f"Error en el proveedor Chutes (HTTP {response.status_code})",
                             "type": "error"
                         }
                         
@@ -144,7 +144,7 @@ async def generate_response_chutes_streaming(prompt: str, model_name: str, api_k
                             }
 
                         # C) Flujo Agente: El LLM está transmitiendo una intención de ejecución de herramienta
-                        streamToolCalls = delta.get("tool_calls", [])
+                        streamToolCalls = delta.get("tool_calls") or []
                         for tc in streamToolCalls:
                             idx = tc.get("index", 0)
                             # Si es el primer chunk de esta herramienta, inicializamos su estructura

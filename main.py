@@ -320,7 +320,6 @@ async def devai_endpoint(request: Request):
             "uuids": uuids, 
             "tokens_entrada": tokens_entrada_acumulados, 
             "tokens_salida": tokens_salida_acumulados,
-            "texto_respuesta" : textoRespuesta
         }
         yield f"{json.dumps(respuesta_final_metadata, ensure_ascii=False)}\n\n"
 

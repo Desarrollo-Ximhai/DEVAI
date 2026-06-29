@@ -168,7 +168,7 @@ async def agenteChutes(historialModificado, objTools, objCodigo, query, model_na
         })
         tool_functions["buscar_conocimiento_fragmentos_codigo"] = objCodigo.buscar_conocimiento_fragmentos_codigo
 
-    async for paso in generate_response_chutes(
+    async for paso in generate_response_chutes_streaming(
         prompt=query,
         model_name=model_name,
         api_key=CHUTES_API_KEY,

@@ -282,8 +282,8 @@ async def devai_endpoint(request: Request):
             streamingTexto = agenteChutes(historialModificado, objTools, objCodigo, query, model_name, archivos_procesados, system_instruction)
 
         async for chunk in streamingTexto:
-            debug('chunk en agente gemini:')
-            debug(chunk)
+            #debug('chunk en agente gemini:')
+            #debug(chunk)
             if chunk.get("type") == "error":
                 #debug(f"Error en streaming:" + chunk['content'])
                 yield f"{json.dumps({'error': chunk['content']}, ensure_ascii=False)}\n\n"

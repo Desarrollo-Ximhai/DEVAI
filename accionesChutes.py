@@ -103,7 +103,8 @@ async def generate_response_chutes_streaming(prompt: str, model_name: str, api_k
                             "content": f"Error en el proveedor Chutes (HTTP {response.status_code})",
                             "type": "error"
                         }
-                        
+                    print('response')
+                    print(response)
                     textoTurnoActual = ""
                     toolCallsStream = {}
 
@@ -120,7 +121,8 @@ async def generate_response_chutes_streaming(prompt: str, model_name: str, api_k
                             resData = json.loads(dataStr)
                         except Exception:
                             continue
-
+                        print('resData')
+                        print(resData)
                         # A) Extracción de métricas de uso de tokens
                         usage = resData.get("usage")
                         if usage:
@@ -259,9 +261,8 @@ async def generate_response_chutes_streaming(prompt: str, model_name: str, api_k
         debug(f"───────────────────────────")
 
         yield {
-            "texto": final_text,
+            "type": "metrics",
             "tokens_entrada": tokens_entrada_total,
-            "tokens_salida": tokens_salida_total,
-            "status": "success"
+            "tokens_salida": tokens_salida_total
         }
 

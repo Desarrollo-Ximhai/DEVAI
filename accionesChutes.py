@@ -126,8 +126,8 @@ async def generate_response_chutes_streaming(prompt: str, model_name: str, api_k
                         # A) Extracción de métricas de uso de tokens
                         usage = resData.get("usage")
                         if usage:
-                            tokens_entrada_total += usage.get("prompt_tokens", 0)
-                            tokens_salida_total += usage.get("completion_tokens", 0)
+                            tokens_entrada_total = usage.get("prompt_tokens", 0)
+                            tokens_salida_total = usage.get("completion_tokens", 0)
 
                         choices = resData.get("choices", [])
                         if not choices:

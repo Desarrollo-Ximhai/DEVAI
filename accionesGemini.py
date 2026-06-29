@@ -23,6 +23,8 @@ async def embed_with_gemini(text, dimension=3072, tipo="retrieval_document"):
 
 async def generate_response_streaming(prompt, model_name, archivos: list = None, configuracion = None, tools: list = None, system_instruction=None, history:list = None):
     debug(f"modelo en generate: {model_name}")
+    debug('history en gemini:')
+    debug(history)
     
     gen_config = {}
 
@@ -49,8 +51,7 @@ async def generate_response_streaming(prompt, model_name, archivos: list = None,
         # Iniciamos el chat SIN enable_automatic_function_calling
         chat_model = genai.GenerativeModel(model_name=model_name, tools=tools, system_instruction=system_instruction)
         chat = chat_model.start_chat(history=history)
-        debug('history en gemini:')
-        debug(history)
+        
 
         # Variables de control para el loop y métricas
         payload_actual = contenidos_payload

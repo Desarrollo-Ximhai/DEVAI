@@ -174,7 +174,6 @@ async def generate_response_chutes_streaming(prompt: str, model_name: str, api_k
                     "type": "error",
                     "content": f"Excepción durante la conexión con Chutes: {str(e)}"
                 }
-                return
 
             # Verificamos si se invocaron herramientas
             tool_calls = list(toolCallsStream.values()) if toolCallsStream else None
@@ -259,7 +258,7 @@ async def generate_response_chutes_streaming(prompt: str, model_name: str, api_k
         debug(f"Tokens Entrada Acumulados: {tokens_entrada_total} | Tokens Salida Acumulados: {tokens_salida_total}")
         debug(f"───────────────────────────")
 
-        return {
+        yield {
             "texto": final_text,
             "tokens_entrada": tokens_entrada_total,
             "tokens_salida": tokens_salida_total,

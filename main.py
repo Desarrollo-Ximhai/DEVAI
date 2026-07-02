@@ -305,6 +305,7 @@ async def devai_endpoint(request: Request):
         debug(f" TOKENS en Agentic , TokIn+: {tokens_entrada_acumulados}, TokOut+: {tokens_salida_acumulados}")
         # Guardado en la memoria de Qdrant  
         uuids = []
+        debug(f"Texto Respuesta: {textoRespuesta.strip()}")
         # if textoRespuesta.strip():
         # uuids = await objMemoria.save_to_qdrant(
         #     embed_fn=embed_with_gemini,

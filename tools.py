@@ -1,10 +1,13 @@
 import asyncio
 import httpx
 import json
+import os
 
 from accionesGemini import embed_with_gemini
 from accionesQdrant import Qdrant, conectarQdrant
 from funciones import debug
+
+XIMHAI_KEY = os.environ.get("XIMHAI_KEY")
 
 
 # =================================================================
@@ -34,7 +37,7 @@ class sqlTools:
         """
         query_embedding768 = await embed_with_gemini(query,768, tipo= "retrieval_query")
         if query_embedding768 is None:
-            return {'error': 'Failed to generate embedding 768 for query'}, 500
+            return f"Error al generar embedding del query"
 
 
         puntos_ganadores = await self.ObjQdrant.search_in_qdrant(user_query=query, query_embedding=query_embedding768, k=40, top_n=10)
@@ -66,7 +69,7 @@ class sqlTools:
         debug(f"🚀 [Tool PHP] Ejecutando consulta solicitada por el Agente:\n👉 {sql}\n")
         
         headers = {
-            "Authorization": f"Bearer DVyskAc4oLtzP8YrDW",
+            "Authorization": f"Bearer {XIMHAI_KEY}",
             "Content-Type": "application/json"
         }
         payload = {"query": sql}
@@ -75,6 +78,8 @@ class sqlTools:
             # Añadimos un timeout estricto para que el agente no se quede colgado si PHP tarda
             async with httpx.AsyncClient() as client:
                 #response = requests.post('https://ebano.ximhai.com/pruebaApi.php', json=payload, headers=headers, timeout=15)
+
+                #Este servicio solo puede ejecutar consultas que empiecen con SELECT, de lo contrario retorna una advertencia
                 response = await client.post('https://ebano.ximhai.com/pruebaApi.php', json=payload, headers=headers, timeout=30.0)
             
             # Si PHP responde con códigos HTTP de error (500, 400, etc.)
@@ -96,7 +101,7 @@ class sqlTools:
             #         "aviso": f"Se encontraron {len(resultados)} registros. Mostrando solo los primeros 100 por seguridad de memoria.",
             #         "data": resultados_truncados
             #     }, ensure_ascii=False)
-                
+            
             return json.dumps(resultados, ensure_ascii=False)
             
         except httpx.TimeoutException:

@@ -275,7 +275,7 @@ async def devai_endpoint(request: Request):
         tokens_entrada_acumulados = 0
         tokens_salida_acumulados = 0
         textoRespuesta = ""
-
+        
         if(proveedor == 'gemini'):
             streamingTexto = agenteGemini(historialModificado, objTools, objCodigo, query, model_name, archivos_procesados, system_instruction)
         else:
@@ -306,15 +306,15 @@ async def devai_endpoint(request: Request):
         # Guardado en la memoria de Qdrant  
         uuids = []
         debug(f"Texto Respuesta: {textoRespuesta.strip()}")
-        # if textoRespuesta.strip():
-        # uuids = await objMemoria.save_to_qdrant(
-        #     embed_fn=embed_with_gemini,
-        #     user_query=query,
-        #     collection_memory=memoria,
-        #     respuesta=textoRespuesta,
-        #     chat_id=chat_id,
-        #     proyecto=proyecto
-        # )
+
+        uuids = await objMemoria.save_to_qdrant(
+            embed_fn=embed_with_gemini,
+            user_query=query,
+            collection_memory=memoria,
+            respuesta=textoRespuesta.strip(),
+            chat_id=chat_id,
+            proyecto=proyecto
+        )
 
         respuesta_final_metadata = {
             "type": "final_metadata",

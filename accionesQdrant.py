@@ -209,7 +209,6 @@ class Qdrant:
 
         if not points:
             debug("⚠️ No se generaron embeddings para guardar memoria.")
-            return
 
         await self.client.upsert(
             collection_name=collection_memory,

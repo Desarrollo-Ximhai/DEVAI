@@ -40,8 +40,15 @@ async def generate_response_streaming(prompt, model_name, archivos: list = None,
     
     if archivos:
         for arc in archivos:
+            mime_tipo = arc["mime_type"]
+            
+            # 💡 BLINDAJE: Si es cualquier variante de texto/código (php, py, js, etc.), 
+            # lo homologamos a 'text/plain' para que Gemini lo acepte sin chistar.
+            if mime_tipo.startswith("text/") or "php" in mime_tipo:
+                mime_tipo = "text/plain"
+
             contenidos_payload.append({
-                "mime_type": arc["mime_type"],
+                "mime_type": mime_tipo,
                 "data": arc["data"]
             })
 

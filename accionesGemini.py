@@ -24,7 +24,8 @@ async def embed_with_gemini(text, dimension=3072, tipo="retrieval_document"):
 async def generate_response_streaming(prompt, model_name, archivos: list = None, configuracion = None, tools: list = None, system_instruction=None, history:list = None):
     debug(f"modelo en generate: {model_name}")
     debug('history en gemini:')
-    debug(history)
+    #debug(history)
+    debug(archivos)
     
     gen_config = {}
 

@@ -33,8 +33,7 @@ async def generate_response_streaming(prompt, model_name, archivos: list = None,
         if 'tipo' in configuracion:
             gen_config['response_mime_type'] = configuracion['tipo']
         
-    gen_config['temperature'] = configuracion.get('temperature', 0.2)
-
+    gen_config['temperature'] = 0.2
     chat_model = genai.GenerativeModel(model_name=model_name, tools=tools)
     contenidos_payload = [prompt]
     

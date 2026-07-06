@@ -38,6 +38,10 @@ async def generate_response_chutes_streaming(prompt: str, model_name: str, api_k
     user_content = []
     if prompt:
         user_content.append({"type": "text", "text": prompt})
+
+
+    debug('messages')        
+    debug(messages)        
         
 
     if archivos:

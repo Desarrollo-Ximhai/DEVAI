@@ -39,36 +39,37 @@ async def generate_response_chutes_streaming(prompt: str, model_name: str, api_k
     if prompt:
         user_content.append({"type": "text", "text": prompt})
         
-    # if archivos:
-    #     for arc in archivos:
-    #         mime = arc.get("mime_type", "image/jpeg")
-    #         data = arc.get("data")
-
-    #         if mime.startswith("text/") or "php" in mime:
-    #             mime = "text/plain"
-
-    #         # Si los bytes vienen crudos del Form, los codificamos a string base64 si no lo están
-    #         if isinstance(data, bytes):
-    #             data = base64.b64encode(data).decode('utf-8')
-                
-    #         user_content.append({
-    #             "type": "image_url",
-    #             "image_url": {"url": f"data:{mime};base64,{data}"}
-    #         })
 
     if archivos:
         for arc in archivos:
-            mime_tipo = arc["mime_type"]
+            mime_tipo = arc.get("mime_type", "")
+            data = arc.get("data", "")
             
-            # 💡 BLINDAJE: Si es cualquier variante de texto/código (php, py, js, etc.), 
-            # lo homologamos a 'text/plain' para que Gemini lo acepte sin chistar.
-            if mime_tipo.startswith("text/") or "php" in mime_tipo:
-                mime_tipo = "text/plain"
-
-            user_content.append({
-                "mime_type": mime_tipo,
-                "data": arc["data"]
-            })
+            # 1. Manejo de texto y código (PHP, JS, Python, etc.)
+            if mime_tipo.startswith("text/") or "php" in mime_tipo or "javascript" in mime_tipo or "json" in mime_tipo:
+                try:
+                    # Asumiendo que 'data' viene en base64 desde tu frontend/cliente
+                    try:
+                        file_text = base64.b64decode(data).decode('utf-8')
+                    except Exception:
+                        # Fallback por si la data ya venía como string de texto plano
+                        file_text = str(data)
+                    
+                    user_content.append({
+                        "type": "text",
+                        "text": f"\n\n--- Contenido de archivo adjunto ---\n{file_text}"
+                    })
+                except Exception as e:
+                    debug(f"⚠️ Error procesando archivo de texto: {e}")
+                    
+            # 2. Manejo de imágenes (Formato OpenAI Vision)
+            elif mime_tipo.startswith("image/"):
+                user_content.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:{mime_tipo};base64,{data}"
+                    }
+                })
 
     if user_content:
         if len(user_content) == 1 and user_content[0]["type"] == "text":

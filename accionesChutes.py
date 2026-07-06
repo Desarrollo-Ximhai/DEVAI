@@ -43,6 +43,10 @@ async def generate_response_chutes_streaming(prompt: str, model_name: str, api_k
         for arc in archivos:
             mime = arc.get("mime_type", "image/jpeg")
             data = arc.get("data")
+
+            if mime.startswith("text/") or "php" in mime:
+                mime = "text/plain"
+
             # Si los bytes vienen crudos del Form, los codificamos a string base64 si no lo están
             if isinstance(data, bytes):
                 data = base64.b64encode(data).decode('utf-8')

@@ -39,21 +39,35 @@ async def generate_response_chutes_streaming(prompt: str, model_name: str, api_k
     if prompt:
         user_content.append({"type": "text", "text": prompt})
         
+    # if archivos:
+    #     for arc in archivos:
+    #         mime = arc.get("mime_type", "image/jpeg")
+    #         data = arc.get("data")
+
+    #         if mime.startswith("text/") or "php" in mime:
+    #             mime = "text/plain"
+
+    #         # Si los bytes vienen crudos del Form, los codificamos a string base64 si no lo están
+    #         if isinstance(data, bytes):
+    #             data = base64.b64encode(data).decode('utf-8')
+                
+    #         user_content.append({
+    #             "type": "image_url",
+    #             "image_url": {"url": f"data:{mime};base64,{data}"}
+    #         })
+
     if archivos:
         for arc in archivos:
-            mime = arc.get("mime_type", "image/jpeg")
-            data = arc.get("data")
+            mime_tipo = arc["mime_type"]
+            
+            # 💡 BLINDAJE: Si es cualquier variante de texto/código (php, py, js, etc.), 
+            # lo homologamos a 'text/plain' para que Gemini lo acepte sin chistar.
+            if mime_tipo.startswith("text/") or "php" in mime_tipo:
+                mime_tipo = "text/plain"
 
-            if mime.startswith("text/") or "php" in mime:
-                mime = "text/plain"
-
-            # Si los bytes vienen crudos del Form, los codificamos a string base64 si no lo están
-            if isinstance(data, bytes):
-                data = base64.b64encode(data).decode('utf-8')
-                
             user_content.append({
-                "type": "image_url",
-                "image_url": {"url": f"data:{mime};base64,{data}"}
+                "mime_type": mime_tipo,
+                "data": arc["data"]
             })
 
     if user_content:

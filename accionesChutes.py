@@ -87,7 +87,7 @@ async def generate_response_chutes_streaming(prompt: str, model_name: str, api_k
 
     debug("\n🗺️  Historial y messages")
     debug("──────────────────────────────────────────────────")
-    debug(messages)
+    #debug(messages)
     debug("──────────────────────────────────────────────────")
 
     modo_agente = bool(tools_schemas and tool_functions)

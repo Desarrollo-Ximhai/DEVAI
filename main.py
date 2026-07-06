@@ -241,8 +241,8 @@ async def devai_endpoint(request: Request):
             })
     #El historial lo aplanamos al numero de tokens que traemos por defecto
     historialModificado = optimizar_y_aplanar_historial(historial, max_tokens)
-    debug('archivos_procesados')
-    debug(archivos_procesados)
+    #debug('archivos_procesados')
+    #debug(archivos_procesados)
     #Objetos de Qdrant para pasarselos a las tools. 
     objQdrant = Qdrant(
         client=client,  

@@ -76,6 +76,8 @@ async def generate_response_chutes_streaming(prompt: str, model_name: str, api_k
     if user_content:
         if len(user_content) == 1 and user_content[0]["type"] == "text":
             messages.append({"role": "user", "content": prompt})
+            debug('messages en chutes')
+            debug(messages)
         else:
             messages.append({"role": "user", "content": user_content})
 

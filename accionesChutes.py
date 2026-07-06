@@ -41,8 +41,8 @@ async def generate_response_chutes_streaming(prompt: str, model_name: str, api_k
         
 
     if archivos:
-        debug('archivos')
-        debug(archivos)
+        #debug('archivos')
+        #debug(archivos)
         for arc in archivos:
             mime_tipo = arc.get("mime_type", "")
             data = arc.get("data", "")

@@ -288,9 +288,7 @@ async def devai_endpoint(request: Request):
             debug('chunk en agente gemini:')
             debug(chunk)
             if chunk.get("type") == "error":
-                debug(f"Error en streaming:" + chunk['content'])
-                yield f"{json.dumps({'error': chunk['content']}, ensure_ascii=False)}\n\n"
-                return
+                yield f"{json.dumps({ 'type': 'error', 'content': chunk['content']}, ensure_ascii=False)}\n\n"
             #CoT
             if chunk.get("type") == "thought":
                 #debug(f"El LLM penso :" + chunk['content'])

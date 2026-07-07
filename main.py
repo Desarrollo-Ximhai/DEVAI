@@ -267,7 +267,7 @@ async def devai_endpoint(request: Request):
     
     if(conCodigo == False):
         objCodigo = None
-
+    query = f"<mainQuery>{query}</mainQuery"
     debug(f"Proveedor: {proveedor} ")
     debug(f"query: {query} ")
     debug(f"model_name: {model_name} ")
@@ -277,6 +277,8 @@ async def devai_endpoint(request: Request):
         tokens_salida_acumulados = 0
         textoRespuesta = ""
         
+        
+
         if(proveedor == 'gemini'):
             streamingTexto = agenteGemini(historialModificado, objTools, objCodigo, query, model_name, archivos_procesados, system_instruction)
         else:

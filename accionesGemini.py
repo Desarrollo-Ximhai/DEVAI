@@ -95,7 +95,7 @@ async def generate_response_streaming(prompt, model_name, archivos: list = None,
                     "type": "error",
                     "content": f"Error en el proveedor Gemini (HTTP {statusCode}): {errorMessage}"
                 }
-                return
+                break
 
             has_tool_calls = False
             function_calls = []

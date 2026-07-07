@@ -285,10 +285,10 @@ async def devai_endpoint(request: Request):
             streamingTexto = agenteChutes(historialModificado, objTools, objCodigo, query, model_name, archivos_procesados, system_instruction)
 
         async for chunk in streamingTexto:
-            #debug('chunk en agente gemini:')
-            #debug(chunk)
+            debug('chunk en agente gemini:')
+            debug(chunk)
             if chunk.get("type") == "error":
-                #debug(f"Error en streaming:" + chunk['content'])
+                debug(f"Error en streaming:" + chunk['content'])
                 yield f"{json.dumps({'error': chunk['content']}, ensure_ascii=False)}\n\n"
                 return
             #CoT
@@ -310,14 +310,14 @@ async def devai_endpoint(request: Request):
         uuids = []
         #debug(f"Texto Respuesta: {textoRespuesta.strip()}")
 
-        # uuids = await objMemoria.save_to_qdrant(
-        #     embed_fn=embed_with_gemini,
-        #     user_query=query,
-        #     collection_memory=memoria,
-        #     respuesta=textoRespuesta.strip(),
-        #     chat_id=chat_id,
-        #     proyecto=proyecto
-        # )
+        uuids = await objMemoria.save_to_qdrant(
+            embed_fn=embed_with_gemini,
+            user_query=query,
+            collection_memory=memoria,
+            respuesta=textoRespuesta.strip(),
+            chat_id=chat_id,
+            proyecto=proyecto
+        )
 
         respuesta_final_metadata = {
             "type": "final_metadata",

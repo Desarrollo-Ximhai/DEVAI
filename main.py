@@ -33,7 +33,7 @@ CHUTES_API_KEY= os.environ.get('CHUTES_API_KEY')
 
 conectarGemini(GOOGLE_API_KEY)
 
-
+@traceable
 def optimizar_y_aplanar_historial(historial: Any, max_tokens: int):
     """
     Parsea, limpia y aplana el historial sin importar si viene como 

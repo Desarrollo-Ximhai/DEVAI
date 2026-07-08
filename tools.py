@@ -26,7 +26,7 @@ class sqlTools:
 # =================================================================
 # Busqueda en QDRANT
 # =================================================================
-    @traceable(run_type="tool", name="Ejecutar_Herramienta_Agente")
+    @traceable(run_type="tool", name="Ejecutar_Herramienta_QDSQL")
     async def buscar_conocimiento_base_datos(self, query: str) -> str:
         debug(f"Buscando en base de datos con tool. {query}")
         """
@@ -56,7 +56,7 @@ class sqlTools:
 # =================================================================
 # Hacer request a PHP
 # =================================================================}
-    @traceable(run_type="tool", name="Ejecutar_Herramienta_Agente")
+    @traceable(run_type="tool", name="Ejecutar_Herramienta_PHPSQL")
     async def ejecutar_consulta_php(self, sql: str) -> str:
         """
         Ejecuta exclusivamente sentencias SQL de tipo SELECT para recuperar datos reales de las filas.
@@ -128,7 +128,7 @@ class codigoTools:
     # =================================================================
     # Busqueda en QDRANT
     # =================================================================
-    @traceable(run_type="tool", name="Ejecutar_Herramienta_Agente")
+    @traceable(run_type="tool", name="Ejecutar_Herramienta_QDCODIGO")
     async def buscar_conocimiento_fragmentos_codigo(self, query: str) -> str:
         debug(f"🔍 [TOOL] Buscando en el Framework de Código: '{query}'")
         """

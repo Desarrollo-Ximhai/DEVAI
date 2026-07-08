@@ -107,6 +107,9 @@ async def generate_response_streaming(prompt, model_name, archivos: list = None,
             async for chunk in response:
                 # 📊 CLAVE 3: El conteo de tokens. Gemini expone las métricas en el último chunk de cada stream.
                 # Al usar += las acumulamos correctamente a lo largo de todo el ciclo de ejecución (bucle while).
+
+                debug(chunk)
+
                 if hasattr(chunk, "usage_metadata") and chunk.usage_metadata:
                     tokens_entrada_total += chunk.usage_metadata.prompt_token_count
                     tokens_salida_total += chunk.usage_metadata.candidates_token_count
@@ -125,7 +128,7 @@ async def generate_response_streaming(prompt, model_name, archivos: list = None,
                             "type": "thought", 
                             "content": f"🧠 Usando la técnica: `{fc.name}`."
                         }
-
+            
                 # Si el chunk contiene texto y NO se han activado herramientas en esta llamada, es la respuesta definitiva
                 elif hasattr(chunk, "text") and chunk.text and not has_tool_calls:
                     yield {

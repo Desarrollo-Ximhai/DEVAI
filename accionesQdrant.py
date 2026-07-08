@@ -185,7 +185,7 @@ class Qdrant:
         debug(respuesta)
         debug(chat_id)
         debug(proyecto)
-        return 'a'
+       
         textos = [
             {"role": "user", "text": user_query.strip()},
             {"role": "assistant", "text": respuesta.strip()},

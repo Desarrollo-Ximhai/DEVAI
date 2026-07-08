@@ -200,22 +200,23 @@ class Qdrant:
                 continue
             debug('emb')
             debug(emb)
-            # unUUUID = uuid.uuid4()
-            # uuids.append(unUUUID)
-            # points.append(
-            #     PointStruct(
-            #         id=str(unUUUID),
-            #         vector=emb,
-            #         payload={
-            #             "text": item["text"],
-            #             "chat_id": chat_id,
-            #             "role": item["role"],
-            #             "project": proyecto,
-            #             "timestamp": datetime.utcnow().isoformat()
-            #         }
-            #     )
-            # )
-
+            unUUUID = uuid.uuid4()
+            uuids.append(unUUUID)
+            points.append(
+                PointStruct(
+                    id=str(unUUUID),
+                    vector=emb,
+                    payload={
+                        "text": item["text"],
+                        "chat_id": chat_id,
+                        "role": item["role"],
+                        "project": proyecto,
+                        "timestamp": datetime.utcnow().isoformat()
+                    }
+                )
+            )
+        debug(points)
+        return 'a'
         if not points:
             debug("⚠️ No se generaron embeddings para guardar memoria.")
 

@@ -2,6 +2,8 @@ import asyncio
 import json 
 from google.api_core import exceptions as googleExceptions
 import google.generativeai as genai
+from langsmith import traceable
+
 
 from funciones import debug
 
@@ -21,6 +23,7 @@ async def embed_with_gemini(text, dimension=3072, tipo="retrieval_document"):
     )
     return res["embedding"] if "embedding" in res else None
 
+@traceable
 async def generate_response_streaming(prompt, model_name, archivos: list = None, configuracion = None, tools: list = None, system_instruction=None, history:list = None):
     debug(f"modelo en generate: {model_name}")
     debug('history en gemini:')
@@ -268,7 +271,7 @@ async def generate_response_streaming(prompt, model_name, archivos: list = None,
         #     "status" : "success"
         # }
 
-
+@traceable
 async def generate_response(prompt, model_name):
     debug(f"modelo en generate: {model_name}")
 

@@ -179,12 +179,7 @@ class Qdrant:
         return await rerank(user_query, results.points, top_n) 
 
     async def save_to_qdrant(self, embed_fn, user_query, collection_memory, respuesta, chat_id, proyecto="default"):
-        debug(embed_fn)
-        debug(user_query)
-        debug(collection_memory)
-        debug(respuesta)
-        debug(chat_id)
-        debug(proyecto)
+        
        
         textos = [
             {"role": "user", "text": user_query.strip()},
@@ -215,8 +210,7 @@ class Qdrant:
                     }
                 )
             )
-        debug('points')
-        debug(points)
+        
         
         if not points:
             debug("⚠️ No se generaron embeddings para guardar memoria.")
@@ -227,8 +221,6 @@ class Qdrant:
             wait=True
         )
         debug(f"✅ Memoria guardada ({len(points)} puntos) para proyecto '{proyecto}'.")
-        debug('uuids')
-        debug(uuids)
         return uuids
 
 

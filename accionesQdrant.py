@@ -226,9 +226,9 @@ class Qdrant:
             points=points,
             wait=True
         )
-        debug('aqui acaba save to qdrant')
-        return 'a'
         debug(f"✅ Memoria guardada ({len(points)} puntos) para proyecto '{proyecto}'.")
+        debug('uuids')
+        debug(uuids)
         return uuids
 
 

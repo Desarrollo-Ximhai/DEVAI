@@ -23,7 +23,7 @@ async def embed_with_gemini(text, dimension=3072, tipo="retrieval_document"):
     )
     return res["embedding"] if "embedding" in res else None
 
-@traceable
+@traceable(run_type="chain", name="Gemini_Agent_Stream")
 async def generate_response_streaming(prompt, model_name, archivos: list = None, configuracion = None, tools: list = None, system_instruction=None, history:list = None):
     debug(f"modelo en generate: {model_name}")
     debug('history en gemini:')
@@ -71,13 +71,13 @@ async def generate_response_streaming(prompt, model_name, archivos: list = None,
         tokens_entrada_total = 0
         tokens_salida_total = 0
         final_text = ""
-
+        chainOfThought_history = []
         while True:
             interaciones_actuales += 1
             if interaciones_actuales > max_iterations:
                 debug(f"🛑 [AGENTE WARN] Se alcanzó el límite de protección de {max_iterations} iteraciones. Forzando cierre.")
                 yield {
-                    "type": "thought",
+                    "type": "error",
                     "content": "Se ha alcanzado el límite de iteraciones en el razonamiento del agente."
                 }
                 break
@@ -146,6 +146,13 @@ async def generate_response_streaming(prompt, model_name, archivos: list = None,
                 func_name = fc.name
                 func_args = dict(fc.args)
                 
+                paso_cot = {
+                    "tool": func_name,
+                    "arguments": func_args,
+                    "iteration": interaciones_actuales,
+                    "response": None # Lo llenaremos tras ejecutar
+                }
+
                 debug(f"🧠 [LLM PENSÓ]: Requiero extraer datos del sistema.")
                 debug(f"   ↳ 🛠️  Llamando a: '{func_name}'")
                 debug(f"   ↳ 📋 Argumentos calculados: {func_args}\n")
@@ -189,6 +196,9 @@ async def generate_response_streaming(prompt, model_name, archivos: list = None,
                     else:
                         res_dict = {"resultado": str(function_response)}
                     
+                    paso_cot["response"] = res_dict
+                    chainOfThought_history.append(paso_cot)
+
                     parte_respuesta = genai.protos.Part(
                         function_response=genai.protos.FunctionResponse(
                             name=func_name,
@@ -216,11 +226,12 @@ async def generate_response_streaming(prompt, model_name, archivos: list = None,
         debug(f"--- Info de la petición Gemini (Agente) ---")
         debug(f"Tokens Entrada Acumulados: {tokens_entrada_total} | Tokens Salida Acumulados: {tokens_salida_total}")
         debug(f"───────────────────────────")
-
+        debug(chainOfThought_history)
         yield {
             "type": "metrics",
             "tokens_entrada": tokens_entrada_total,
-            "tokens_salida": tokens_salida_total
+            "tokens_salida": tokens_salida_total,
+            "chain_of_thought": chainOfThought_history
         }
     # 📝 MODO NORMAL: Si no hay herramientas, se ejecuta el 'generate_content' clásico sin loop
     else:

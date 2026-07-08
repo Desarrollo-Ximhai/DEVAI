@@ -1,10 +1,12 @@
 import asyncio
 import httpx
 import json
+from langsmith import traceable
 import os
 
 from accionesGemini import embed_with_gemini
 from accionesQdrant import Qdrant, conectarQdrant
+
 from funciones import debug
 
 XIMHAI_KEY = os.environ.get("XIMHAI_KEY")
@@ -24,6 +26,7 @@ class sqlTools:
 # =================================================================
 # Busqueda en QDRANT
 # =================================================================
+    @traceable(run_type="tool", name="Ejecutar_Herramienta_Agente")
     async def buscar_conocimiento_base_datos(self, query: str) -> str:
         debug(f"Buscando en base de datos con tool. {query}")
         """
@@ -52,7 +55,8 @@ class sqlTools:
 
 # =================================================================
 # Hacer request a PHP
-# =================================================================
+# =================================================================}
+    @traceable(run_type="tool", name="Ejecutar_Herramienta_Agente")
     async def ejecutar_consulta_php(self, sql: str) -> str:
         """
         Ejecuta exclusivamente sentencias SQL de tipo SELECT para recuperar datos reales de las filas.
@@ -124,7 +128,7 @@ class codigoTools:
     # =================================================================
     # Busqueda en QDRANT
     # =================================================================
-
+    @traceable(run_type="tool", name="Ejecutar_Herramienta_Agente")
     async def buscar_conocimiento_fragmentos_codigo(self, query: str) -> str:
         debug(f"🔍 [TOOL] Buscando en el Framework de Código: '{query}'")
         """

@@ -179,7 +179,13 @@ class Qdrant:
         return await rerank(user_query, results.points, top_n) 
 
     async def save_to_qdrant(self, embed_fn, user_query, collection_memory, respuesta, chat_id, proyecto="default"):
-        
+        debug(embed_fn)
+        debug(user_query)
+        debug(collection_memory)
+        debug(respuesta)
+        debug(chat_id)
+        debug(proyecto)
+        return 'a'
         textos = [
             {"role": "user", "text": user_query.strip()},
             {"role": "assistant", "text": respuesta.strip()},

@@ -37,7 +37,6 @@ async def generate_response_streaming(prompt, model_name, archivos: list = None,
             gen_config['response_mime_type'] = configuracion['tipo']
         
     gen_config['temperature'] = 0.05
-    #gen_config['thinking_config'] = {"include_thoughts" : True}
     chat_model = genai.GenerativeModel(model_name=model_name, tools=tools)
     contenidos_payload = [prompt]
     

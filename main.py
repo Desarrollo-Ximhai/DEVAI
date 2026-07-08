@@ -192,7 +192,7 @@ async def health():
     return {
         "status": "ok"
     }
-    
+
 @traceable
 @app.post("/devaiAgent", dependencies=[Depends(verificar_clave)])
 async def devai_endpoint(request: Request):
@@ -289,8 +289,8 @@ async def devai_endpoint(request: Request):
             streamingTexto = agenteChutes(historialModificado, objTools, objCodigo, query, model_name, archivos_procesados, system_instruction)
 
         async for chunk in streamingTexto:
-            debug('chunk en agente gemini:')
-            debug(chunk)
+            #debug('chunk en agente gemini:')
+            #debug(chunk)
             if chunk.get("type") == "error":
                 yield f"{json.dumps({ 'type': 'error', 'content': chunk['content']}, ensure_ascii=False)}\n\n"
             #CoT

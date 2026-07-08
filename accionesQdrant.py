@@ -200,11 +200,11 @@ class Qdrant:
                 continue
             debug('emb')
             debug(emb)
-            unUUUID = uuid.uuid4()
+            unUUUID = str(uuid.uuid4())
             uuids.append(unUUUID)
             points.append(
                 PointStruct(
-                    id=str(unUUUID),
+                    id=unUUUID,
                     vector=emb,
                     payload={
                         "text": item["text"],

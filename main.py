@@ -8,6 +8,7 @@ import uuid
 
 from fastapi import FastAPI, Request, UploadFile, Depends, HTTPException, Header
 from fastapi.responses import StreamingResponse
+from langsmith import traceable
 from pydantic import BaseModel
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Filter, FieldCondition, MatchValue, PointStruct
@@ -75,6 +76,7 @@ def optimizar_y_aplanar_historial(historial: Any, max_tokens: int):
         tokens_acumulados += tokens_turno
     return historial_plano_final
 
+@traceable
 async def agenteGemini(historialModificado, objTools, objCodigo, query, model_name, archivos, system_instruction):
     historial_gemini = []
     for turno in historialModificado:
@@ -98,6 +100,7 @@ async def agenteGemini(historialModificado, objTools, objCodigo, query, model_na
     ):
         yield paso
 
+@traceable
 async def agenteChutes(historialModificado, objTools, objCodigo, query, model_name, archivos, system_instruction):
     historial_chutes = []
     for turno in historialModificado:
@@ -189,7 +192,8 @@ async def health():
     return {
         "status": "ok"
     }
-
+    
+@traceable
 @app.post("/devaiAgent", dependencies=[Depends(verificar_clave)])
 async def devai_endpoint(request: Request):
     client = conectarQdrant(QDRANT_URL, QDRANT_API_KEY)

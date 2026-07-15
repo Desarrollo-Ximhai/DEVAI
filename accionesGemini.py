@@ -65,7 +65,7 @@ async def generate_response_streaming(prompt, model_name, archivos: list = None,
 
         # Variables de control para el loop y métricas
         payload_actual = contenidos_payload
-        max_iterations = 6
+        max_iterations = 10
         interaciones_actuales = 0
         
         tokens_entrada_total = 0

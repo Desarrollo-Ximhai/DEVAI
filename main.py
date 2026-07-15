@@ -228,6 +228,7 @@ async def devai_endpoint(request: Request):
     proyecto = form_data.get("proyecto", "default")
     proveedor = form_data.get("proveedor", "gemini")
     system_instruction = form_data.get("system_instruction", default_system_instruction)
+    url = form_data.get("url", "https://ximhai.com")
     conCodigo = form_data.get("conCodigo", False)
     
     model_name = form_data.get("model_name", "models/gemini-3.1-flash-lite") 
@@ -266,7 +267,7 @@ async def devai_endpoint(request: Request):
         proyecto=None
     )
     #Objetos de tools, ya con el objeto de Qdrant para el tema de la collection.
-    objTools = sqlTools(objQdrant=objQdrant)
+    objTools = sqlTools(objQdrant=objQdrant, url=url)
     objCodigo = codigoTools(objQdrant=objQdrantCodigo)
     
     if(conCodigo == False):

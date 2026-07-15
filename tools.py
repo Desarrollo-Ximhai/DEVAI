@@ -16,12 +16,13 @@ XIMHAI_KEY = os.environ.get("XIMHAI_KEY")
 # Clase para tools de base de datos, para poder instanciar desde main
 # =================================================================
 class sqlTools:
-    def __init__(self, objQdrant: Qdrant):
+    def __init__(self, objQdrant: Qdrant, url:str):
         """
         Recibe el motor de Qdrant ya configurado con el proyecto 
         y la colección de la petición actual.
         """
         self.ObjQdrant = objQdrant
+        self.url = url
 
 # =================================================================
 # Busqueda en QDRANT
@@ -81,10 +82,9 @@ class sqlTools:
         try:
             # Añadimos un timeout estricto para que el agente no se quede colgado si PHP tarda
             async with httpx.AsyncClient() as client:
-                #response = requests.post('https://ebano.ximhai.com/pruebaApi.php', json=payload, headers=headers, timeout=15)
 
                 #Este servicio solo puede ejecutar consultas que empiecen con SELECT, de lo contrario retorna una advertencia
-                response = await client.post('https://ebano.ximhai.com/pruebaApi.php', json=payload, headers=headers, timeout=30.0)
+                response = await client.post(f"{self.url}/pruebaApi.php", json=payload, headers=headers, timeout=30.0)
             
             # Si PHP responde con códigos HTTP de error (500, 400, etc.)
             if response.status_code != 200:
@@ -96,7 +96,6 @@ class sqlTools:
             if data_php.get("status") == "error":
                 return f"ERROR_SQL_PHP: {data_php.get('message')}"
                 
-            # --- EL GUARDRAIL MÁS IMPORTANTE: Control de volumen ---
             resultados = data_php.get("resultado", [])
             # if len(resultados) > 100:
             #     # Truncamos para no saturar la ventana de contexto de Gemini

@@ -185,16 +185,16 @@ class Qdrant:
             {"role": "user", "text": user_query.strip()},
             {"role": "assistant", "text": respuesta.strip()},
         ]
-        debug('textos')
-        debug(textos)
+        # debug('textos')
+        # debug(textos)
         points = []
         uuids = []
         for item in textos:
             emb = await embed_fn(item["text"],768)
             if emb is None:
                 continue
-            debug('emb')
-            debug(emb)
+            # debug('emb')
+            # debug(emb)
             unUUUID = str(uuid.uuid4())
             uuids.append(unUUUID)
             points.append(

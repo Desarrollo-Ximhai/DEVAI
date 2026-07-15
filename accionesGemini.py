@@ -110,8 +110,9 @@ async def generate_response_streaming(prompt, model_name, archivos: list = None,
                 debug(chunk)
 
                 if hasattr(chunk, "usage_metadata") and chunk.usage_metadata:
-                    tokens_entrada_total += chunk.usage_metadata.prompt_token_count
-                    tokens_salida_total += chunk.usage_metadata.candidates_token_count
+                    #No se hace un += porque el proip metadata ya hace la suma
+                    tokens_entrada_total = chunk.usage_metadata.prompt_token_count
+                    tokens_salida_total = chunk.usage_metadata.candidates_token_count
 
                 # Evaluamos si el chunk actual trae intenciones de ejecución de herramientas
                 function_calls_chunk = []

@@ -293,7 +293,7 @@ async def generate_response_chutes_streaming(prompt: str, model_name: str, api_k
 
         debug(f"--- Info de la petición Chutes ---")
         debug(f"Tokens Entrada Acumulados: {tokens_entrada_total} | Tokens Salida Acumulados: {tokens_salida_total}")
-        debug(chainOfThought_history)
+        #debug(chainOfThought_history)
         debug(f"───────────────────────────")
 
         yield {

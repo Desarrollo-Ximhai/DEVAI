@@ -230,7 +230,7 @@ async def generate_response_streaming(prompt, model_name, archivos: list = None,
         debug(f"--- Info de la petición Gemini (Agente) ---")
         debug(f"Tokens Entrada Acumulados: {tokens_entrada_total} | Tokens Salida Acumulados: {tokens_salida_total}")
         debug(f"───────────────────────────")
-        debug(chainOfThought_history)
+        #debug(chainOfThought_history)
         yield {
             "type": "metrics",
             "tokens_entrada": tokens_entrada_total,

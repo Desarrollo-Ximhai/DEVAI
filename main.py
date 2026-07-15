@@ -86,7 +86,7 @@ async def agenteGemini(historialModificado, objTools, objCodigo, query, model_na
             "role": rol_gemini,
             "parts": [turno["content"]]  
         })
-    lista_tools = [objTools.buscar_conocimiento_base_datos, objTools.ejecutar_consulta_php]
+    lista_tools = [objTools.buscar_ejemplos_few_shots,objTools.buscar_conocimiento_base_datos, objTools.ejecutar_consulta_php]
     if(objCodigo):
         lista_tools.append(objCodigo.buscar_conocimiento_fragmentos_codigo)
 
@@ -145,6 +145,23 @@ async def agenteChutes(historialModificado, objTools, objCodigo, query, model_na
                 }
             }
         },
+        {
+            "type": "function",
+            "function": {
+                "name": "buscar_ejemplos_few_shots",
+                "description": "Busca ejemplos históricos (few-shots) de cómo el sistema ha resuelto exitosamente peticiones similares en el pasado. Útil para entender qué herramientas usar, cómo encadenarlas y cómo corregir errores SQL o lógicos.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "La intención o pregunta actual del usuario (ej: 'lista de lotes y dueños')."
+                        }
+                    },
+                    "required": ["query"]
+                }
+            }
+        }
     ]
     tool_functions = {
         "buscar_conocimiento_base_datos": objTools.buscar_conocimiento_base_datos,

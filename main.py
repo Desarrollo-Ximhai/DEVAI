@@ -272,6 +272,8 @@ async def devai_endpoint(request: Request):
     
     if(conCodigo == False):
         objCodigo = None
+
+    queryAux = query
     query = f"<mainQuery>{query}</mainQuery"
     debug(f"Proveedor: {proveedor} ")
     debug(f"query: {query} ")
@@ -306,6 +308,7 @@ async def devai_endpoint(request: Request):
             elif chunk.get("type") == "metrics":
                 tokens_entrada_acumulados = chunk["tokens_entrada"]
                 tokens_salida_acumulados = chunk["tokens_salida"]
+                cot = chunk['chain_of_thought']
 
         debug(f"Streaming finalizado. Guardando memoria... Chars: {len(textoRespuesta)}")
         debug(f" TOKENS en Agentic , TokIn+: {tokens_entrada_acumulados}, TokOut+: {tokens_salida_acumulados}")
@@ -315,10 +318,18 @@ async def devai_endpoint(request: Request):
 
         uuids = await objMemoria.save_to_qdrant(
             embed_fn=embed_with_gemini,
-            user_query=query,
+            user_query=queryAux,
             collection_memory=memoria,
             respuesta=textoRespuesta.strip(),
             chat_id=chat_id,
+            proyecto=proyecto
+        )
+        uuids = await objMemoria.guardarShot(
+            embed_fn=embed_with_gemini,
+            user_query=queryAux,
+            collection_memory="DevAI-FewShots",
+            cot = cot,
+            respuesta=textoRespuesta.strip(),
             proyecto=proyecto
         )
 

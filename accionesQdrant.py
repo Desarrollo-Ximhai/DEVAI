@@ -178,6 +178,44 @@ class Qdrant:
         #Reranking
         return await rerank(user_query, results.points, top_n) 
 
+    async def guardarShot(self, embed_fn, user_query, collection_memory, cot, respuesta, proyecto="default"):
+        
+        points = []
+        uuids = []
+        
+        emb = await embed_fn(user_query,768)
+        if emb is None:
+            pass
+        # debug('emb')
+        # debug(emb)
+        unUUUID = str(uuid.uuid4())
+        uuids.append(unUUUID)
+        points.append(
+            PointStruct(
+                id=unUUUID,
+                vector=emb,
+                payload={
+                    "user_query": user_query,
+                    "chain_of_thought": cot,
+                    "project": proyecto,
+                    "final_response" : respuesta, 
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+            )
+        )
+        
+        
+        if not points:
+            debug("⚠️ No se generaron embeddings para guardar memoria.")
+       
+        await self.client.upsert(
+            collection_name=collection_memory,
+            points=points,
+            wait=True
+        )
+        debug(f"✅ Memoria guardada ({len(points)} puntos) para proyecto '{proyecto}'.")
+        return uuids
+
     async def save_to_qdrant(self, embed_fn, user_query, collection_memory, respuesta, chat_id, proyecto="default"):
         
        

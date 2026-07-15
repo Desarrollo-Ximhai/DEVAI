@@ -89,7 +89,7 @@ async def generate_response_chutes_streaming(prompt: str, model_name: str, api_k
     tokens_entrada_total = 0
     tokens_salida_total = 0
     final_text = ""
-    
+    chainOfThought_history = []
     # 🛡️ CONTADOR DE ITERACIONES PARA EVITAR LOCURAS N+1
     interaciones_actuales = 0
     max_iterations = 6 
@@ -227,6 +227,13 @@ async def generate_response_chutes_streaming(prompt: str, model_name: str, api_k
                     except Exception:
                         func_args = {}
                     
+                    paso_cot = {
+                        "tool": func_name,
+                        "arguments": func_args,
+                        "iteration": interaciones_actuales,
+                        "response": None # Lo llenaremos tras ejecutar
+                    }
+
                     debug(f"🧠 [LLM PENSÓ]: Requiero extraer datos contextuales.")
                     debug(f"   ↳ 🛠️  Llamando a: '{func_name}'")
                     debug(f"   ↳ 📋 Argumentos calculados: {func_args}\n")
@@ -255,7 +262,8 @@ async def generate_response_chutes_streaming(prompt: str, model_name: str, api_k
                         }
 
                         content_str = function_response if isinstance(function_response, str) else json.dumps(function_response, ensure_ascii=False)                    
-        
+                        paso_cot["response"] = content_str
+                        chainOfThought_history.append(paso_cot)
                         debug(f"   ↳ 📄 [CONTENIDO ENVIADO]: {content_str}\n")
 
                         messages.append({
@@ -285,11 +293,13 @@ async def generate_response_chutes_streaming(prompt: str, model_name: str, api_k
 
         debug(f"--- Info de la petición Chutes ---")
         debug(f"Tokens Entrada Acumulados: {tokens_entrada_total} | Tokens Salida Acumulados: {tokens_salida_total}")
+        debug(chainOfThought_history)
         debug(f"───────────────────────────")
 
         yield {
             "type": "metrics",
             "tokens_entrada": tokens_entrada_total,
-            "tokens_salida": tokens_salida_total
+            "tokens_salida": tokens_salida_total,
+            "chain_of_thought": chainOfThought_history
         }
 

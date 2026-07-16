@@ -249,7 +249,8 @@ class systemTools:
         payload = {
             
         }
-        
+        debug(headers)
+        debug(self.url)
         try:
             async with httpx.AsyncClient() as client:
                 # Reemplaza 'gateway_ia.php' con el nombre de tu endpoint ruteador

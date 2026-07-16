@@ -224,6 +224,7 @@ class systemTools:
         self.url = url
 
     @traceable(run_type="tool", name="Buscar_Herramientas_Personalizadas_PHP")
+    @traceable(run_type="chain", name="Buscar_Herramientas_Personalizadas_PHP")
     async def buscar_herramientas_personalizadas_php(self) -> str:
         """
         Busca en el servidor backend qué funciones o herramientas personalizadas de negocio están disponibles 
@@ -252,7 +253,7 @@ class systemTools:
         try:
             async with httpx.AsyncClient() as client:
                 # Reemplaza 'gateway_ia.php' con el nombre de tu endpoint ruteador
-                response = await client.post(f"{self.url}/funciones-devAI.php", json=payload, headers=headers, timeout=15.0)
+                response = await client.post(f"{self.url}/funciones-devAI.php", json=payload, headers=headers, timeout=5.0)
             
             if response.status_code != 200:
                 return f"ERROR_SISTEMA: El servidor PHP respondió con código HTTP {response.status_code}. Detalle: {response.text}"

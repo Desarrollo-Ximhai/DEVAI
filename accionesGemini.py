@@ -141,9 +141,16 @@ async def generate_response_streaming(prompt, model_name, archivos: list = None,
             debug("\n🗺️  [TRAZA DE PASOS Y RAZONAMIENTO DEL AGENTE - GEMINI]")
             debug("──────────────────────────────────────────────────")
             
+            def purgar_protobuf(obj):
+                if hasattr(obj, "items"): # Detecta MapComposite, Structs de Google y dicts
+                    return {k: purgar_protobuf(v) for k, v in obj.items()}
+                elif isinstance(obj, list): # Por si Gemini llega a mandar una lista de objetos
+                    return [purgar_protobuf(x) for x in obj]
+                return obj
+
             for fc in function_calls:
                 func_name = fc.name
-                func_args = dict(fc.args)
+                func_args = purgar_protobuf(fc.args)
                 
                 paso_cot = {
                     "tool": func_name,

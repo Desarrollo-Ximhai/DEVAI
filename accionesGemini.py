@@ -150,7 +150,6 @@ async def generate_response_streaming(prompt, model_name, archivos: list = None,
                     "tool": func_name,
                     "arguments": func_args,
                     "iteration": interaciones_actuales,
-                    "response": None # Lo llenaremos tras ejecutar
                 }
 
                 debug(f"🧠 [LLM PENSÓ]: Requiero extraer datos del sistema.")
@@ -196,7 +195,7 @@ async def generate_response_streaming(prompt, model_name, archivos: list = None,
                     else:
                         res_dict = {"resultado": str(function_response)}
                     
-                    paso_cot["response"] = res_dict
+                    #paso_cot["response"] = res_dict
                     chainOfThought_history.append(paso_cot)
 
                     parte_respuesta = genai.protos.Part(

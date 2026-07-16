@@ -231,7 +231,6 @@ async def generate_response_chutes_streaming(prompt: str, model_name: str, api_k
                         "tool": func_name,
                         "arguments": func_args,
                         "iteration": interaciones_actuales,
-                        "response": None # Lo llenaremos tras ejecutar
                     }
 
                     debug(f"🧠 [LLM PENSÓ]: Requiero extraer datos contextuales.")
@@ -262,7 +261,7 @@ async def generate_response_chutes_streaming(prompt: str, model_name: str, api_k
                         }
 
                         content_str = function_response if isinstance(function_response, str) else json.dumps(function_response, ensure_ascii=False)                    
-                        paso_cot["response"] = content_str
+                        #paso_cot["response"] = content_str
                         chainOfThought_history.append(paso_cot)
                         debug(f"   ↳ 📄 [CONTENIDO ENVIADO]: {content_str}\n")
 

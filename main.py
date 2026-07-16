@@ -205,6 +205,9 @@ async def agenteChutes(historialModificado, objTools, objCodigo, objSystem, quer
         }
     ]
     tool_functions = {
+        "buscar_herramientas_personalizadas_php": objSystem.buscar_herramientas_personalizadas_php,
+        "ejecutar_herramienta_personalizada_php": objSystem.ejecutar_herramienta_personalizada_php,
+        "buscar_ejemplos_few_shots": objTools.buscar_ejemplos_few_shots,
         "buscar_conocimiento_base_datos": objTools.buscar_conocimiento_base_datos,
         "ejecutar_consulta_php": objTools.ejecutar_consulta_php,
     }

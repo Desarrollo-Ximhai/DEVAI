@@ -201,7 +201,6 @@ class Qdrant:
                     "user_query": user_query,
                     "chain_of_thought": cot,
                     "project": proyecto,
-                    "final_response" : respuesta, 
                     "timestamp": datetime.utcnow().isoformat()
                 }
             )

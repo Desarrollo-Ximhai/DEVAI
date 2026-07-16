@@ -32,7 +32,7 @@ async def generate_response_streaming(prompt, model_name, archivos: list = None,
         if 'tipo' in configuracion:
             gen_config['response_mime_type'] = configuracion['tipo']
         
-    gen_config['temperature'] = 0.05
+    gen_config['temperature'] = 0
     chat_model = genai.GenerativeModel(model_name=model_name, tools=tools)
     contenidos_payload = [prompt]
     
@@ -103,7 +103,6 @@ async def generate_response_streaming(prompt, model_name, archivos: list = None,
                 # 📊 CLAVE 3: El conteo de tokens. Gemini expone las métricas en el último chunk de cada stream.
                 # Al usar += las acumulamos correctamente a lo largo de todo el ciclo de ejecución (bucle while).
 
-                debug(chunk)
 
                 if hasattr(chunk, "usage_metadata") and chunk.usage_metadata:
                     #No se hace un += porque el proip metadata ya hace la suma

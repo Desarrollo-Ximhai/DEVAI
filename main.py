@@ -313,12 +313,12 @@ async def devai_endpoint(request: Request):
         collection=bd,
         proyecto=proyecto
     )
-    # objMemoria = Qdrant(
-    #     client=client,
-    #     collection=memoria,
-    #     proyecto=proyecto
-    # )
-    objShots = Qdrant(
+    objMemoria = Qdrant(
+        client=client,
+        collection=memoria,
+        proyecto=proyecto
+    )
+    objShotsQ = Qdrant(
         client=client,
         collection='DevAI-FewShots',
         proyecto=proyecto
@@ -333,7 +333,7 @@ async def devai_endpoint(request: Request):
 
     #Objetos de tools, ya con el objeto de Qdrant para el tema de la collection y url para ejecutar la consulta en php.
     objTools = sqlTools(objQdrant=objQdrant, url=url)
-    objShots = shotsTools(objQdrant=objQdrant)
+    objShots = shotsTools(objQdrant=objShotsQ)
     objCodigo = codigoTools(objQdrant=objQdrantCodigo)
     objSystem = systemTools(url=url)
 

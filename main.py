@@ -19,7 +19,7 @@ from accionesQdrant import Qdrant, conectarQdrant
 from accionesGemini import conectarGemini, generate_response, generate_response_streaming, embed_with_gemini
 from accionesChutes import  generate_response_chutes_streaming
 from funciones import debug
-from tools import sqlTools, codigoTools, systemTools
+from tools import sqlTools, codigoTools, systemTools, shotsTools
 
 ADMIN_KEY = os.environ.get("ADMIN_API_KEY")
 def verificar_clave(api_key: str = Header(...)):

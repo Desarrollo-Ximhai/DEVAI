@@ -187,7 +187,7 @@ class shotsTools:
             user_query=query, 
             query_embedding=query_embedding768, 
             k=15, 
-            top_n=2 
+            top_n=1
         )
         
         if not puntos_ganadores:

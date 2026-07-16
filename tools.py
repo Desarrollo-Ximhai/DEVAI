@@ -54,59 +54,6 @@ class sqlTools:
             
         return "\n\n---\n\n".join(contexto_para_el_agente)
 
-# =================================================================
-# Busqueda en Few Shots
-# =================================================================
-    @traceable(run_type="tool", name="Buscar_Ejemplos_Few_Shots")
-    async def buscar_ejemplos_few_shots(self, query: str) -> str:
-        debug(f"Buscando ejemplos few-shots con tool. {query}")
-        """
-        Busca ejemplos históricos (few-shots) de cómo el sistema ha resuelto exitosamente 
-        peticiones similares en el pasado. Útil para entender qué herramientas usar, cómo 
-        encadenarlas y cómo corregir errores SQL o lógicos.
-        
-        Args:
-            query: La intención o pregunta actual del usuario (ej: "lista de lotes y dueños").
-        Returns:
-            Un string en formato Markdown detallando los flujos de resolución previos (Chain of Thought).
-        """
-        query_embedding768 = await embed_with_gemini(query, 768, tipo="retrieval_query")
-        if query_embedding768 is None:
-            return "Error al generar embedding del query para few-shots."
-
-        # Se reduce top_n a 2 o 3 para no reventar los tokens del LLM con JSONs largos
-        puntos_ganadores = await self.ObjQdrant.search_in_qdrant(
-            user_query=query, 
-            query_embedding=query_embedding768, 
-            k=15, 
-            top_n=2 
-        )
-        
-        if not puntos_ganadores:
-            return "No se encontraron ejemplos de resolución previos para esta consulta."
-
-        ejemplos_para_el_agente = []
-        for i, p in enumerate(puntos_ganadores, 1):
-            payload = p.payload
-            
-            # Extraemos los datos basados en la estructura del payload
-            user_query = payload.get("user_query", "Sin query registrado")
-            final_response = payload.get("final_response", "Sin respuesta final registrada")
-            cot = payload.get("chain_of_thought", [])
-            
-            # Convertimos el arreglo/diccionario a un string JSON formateado para que el LLM lo lea bien
-            cot_str = json.dumps(cot, indent=2, ensure_ascii=False) if isinstance(cot, (list, dict)) else str(cot)
-            
-            ejemplo_texto = (
-                f"### EJEMPLO DE REFERENCIA {i} ###\n"
-                f"**Pregunta del usuario:** {user_query}\n\n"
-                f"**Proceso lógico y uso de herramientas (Chain of Thought):**\n"
-                f"```json\n{cot_str}\n```\n\n"
-                f"**Respuesta final generada:** {final_response}\n"
-            )
-            ejemplos_para_el_agente.append(ejemplo_texto)
-            
-        return "\n\n---\n\n".join(ejemplos_para_el_agente)
 
 # =================================================================
 # Hacer request a PHP
@@ -206,6 +153,68 @@ class codigoTools:
             contexto_para_el_agente.append(texto_chunk)
             
         return "\n\n---\n\n".join(contexto_para_el_agente)
+
+class shotsTools:
+    def __init__(self, objQdrant: Qdrant):
+        """
+        Recibe el motor de Qdrant ya configurado con el proyecto 
+        y la colección de la petición actual.
+        """
+        self.ObjQdrant = objQdrant
+        
+# =================================================================
+# Busqueda en Few Shots
+# =================================================================
+    @traceable(run_type="tool", name="Buscar_Ejemplos_Few_Shots")
+    async def buscar_ejemplos_few_shots(self, query: str) -> str:
+        debug(f"Buscando ejemplos few-shots con tool. {query}")
+        """
+        Busca ejemplos históricos (few-shots) de cómo el sistema ha resuelto exitosamente 
+        peticiones similares en el pasado. Útil para entender qué herramientas usar, cómo 
+        encadenarlas y cómo corregir errores SQL o lógicos.
+        
+        Args:
+            query: La intención o pregunta actual del usuario (ej: "lista de lotes y dueños").
+        Returns:
+            Un string en formato Markdown detallando los flujos de resolución previos (Chain of Thought).
+        """
+        query_embedding768 = await embed_with_gemini(query, 768, tipo="retrieval_query")
+        if query_embedding768 is None:
+            return "Error al generar embedding del query para few-shots."
+
+        # Se reduce top_n a 2 o 3 para no reventar los tokens del LLM con JSONs largos
+        puntos_ganadores = await self.ObjQdrant.search_in_qdrant(
+            user_query=query, 
+            query_embedding=query_embedding768, 
+            k=15, 
+            top_n=2 
+        )
+        
+        if not puntos_ganadores:
+            return "No se encontraron ejemplos de resolución previos para esta consulta."
+
+        ejemplos_para_el_agente = []
+        for i, p in enumerate(puntos_ganadores, 1):
+            payload = p.payload
+            
+            # Extraemos los datos basados en la estructura del payload
+            user_query = payload.get("user_query", "Sin query registrado")
+            final_response = payload.get("final_response", "Sin respuesta final registrada")
+            cot = payload.get("chain_of_thought", [])
+            
+            # Convertimos el arreglo/diccionario a un string JSON formateado para que el LLM lo lea bien
+            cot_str = json.dumps(cot, indent=2, ensure_ascii=False) if isinstance(cot, (list, dict)) else str(cot)
+            
+            ejemplo_texto = (
+                f"### EJEMPLO DE REFERENCIA {i} ###\n"
+                f"**Pregunta del usuario:** {user_query}\n\n"
+                f"**Proceso lógico y uso de herramientas (Chain of Thought):**\n"
+                f"```json\n{cot_str}\n```\n\n"
+                f"**Respuesta final generada:** {final_response}\n"
+            )
+            ejemplos_para_el_agente.append(ejemplo_texto)
+            
+        return "\n\n---\n\n".join(ejemplos_para_el_agente)
 
 class systemTools:
     def __init__(self, url:str):

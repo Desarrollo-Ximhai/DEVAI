@@ -77,7 +77,7 @@ def optimizar_y_aplanar_historial(historial: Any, max_tokens: int):
     return historial_plano_final
 
 @traceable
-async def agenteGemini(historialModificado, objTools, objCodigo, objSystem, query, model_name, archivos, system_instruction):
+async def agenteGemini(historialModificado, objTools, objShots, objCodigo, objSystem, query, model_name, archivos, system_instruction):
     historial_gemini = []
     for turno in historialModificado:
         # Gemini exige 'model' en lugar de 'assistant'
@@ -89,7 +89,7 @@ async def agenteGemini(historialModificado, objTools, objCodigo, objSystem, quer
     lista_tools = [
         objSystem.buscar_herramientas_personalizadas_php, 
         objSystem.ejecutar_herramienta_personalizada_php, 
-        objTools.buscar_ejemplos_few_shots,
+        objShots.buscar_ejemplos_few_shots,
         objTools.buscar_conocimiento_base_datos, 
         objTools.ejecutar_consulta_php
         ]
@@ -107,7 +107,7 @@ async def agenteGemini(historialModificado, objTools, objCodigo, objSystem, quer
         yield paso
 
 @traceable
-async def agenteChutes(historialModificado, objTools, objCodigo, objSystem, query, model_name, archivos, system_instruction):
+async def agenteChutes(historialModificado, objTools, objShots, objCodigo, objSystem, query, model_name, archivos, system_instruction):
     historial_chutes = []
     for turno in historialModificado:
         rol_chutes = "assistant" if turno["role"] == "assistant" else "user"
@@ -207,7 +207,7 @@ async def agenteChutes(historialModificado, objTools, objCodigo, objSystem, quer
     tool_functions = {
         "buscar_herramientas_personalizadas_php": objSystem.buscar_herramientas_personalizadas_php,
         "ejecutar_herramienta_personalizada_php": objSystem.ejecutar_herramienta_personalizada_php,
-        "buscar_ejemplos_few_shots": objTools.buscar_ejemplos_few_shots,
+        "buscar_ejemplos_few_shots": objShots.buscar_ejemplos_few_shots,
         "buscar_conocimiento_base_datos": objTools.buscar_conocimiento_base_datos,
         "ejecutar_consulta_php": objTools.ejecutar_consulta_php,
     }
@@ -313,13 +313,17 @@ async def devai_endpoint(request: Request):
         collection=bd,
         proyecto=proyecto
     )
-    objMemoria = Qdrant(
+    # objMemoria = Qdrant(
+    #     client=client,
+    #     collection=memoria,
+    #     proyecto=proyecto
+    # )
+    objShots = Qdrant(
         client=client,
-        collection=memoria,
+        collection='DevAI-FewShots',
         proyecto=proyecto
     )
-
-
+    
     objQdrantCodigo = Qdrant(
         client=client,  
         collection=codigo,
@@ -329,6 +333,7 @@ async def devai_endpoint(request: Request):
 
     #Objetos de tools, ya con el objeto de Qdrant para el tema de la collection y url para ejecutar la consulta en php.
     objTools = sqlTools(objQdrant=objQdrant, url=url)
+    objShots = shotsTools(objQdrant=objQdrant)
     objCodigo = codigoTools(objQdrant=objQdrantCodigo)
     objSystem = systemTools(url=url)
 
@@ -345,9 +350,9 @@ async def devai_endpoint(request: Request):
         textoRespuesta = ""
         
         if(proveedor == 'gemini'):
-            streamingTexto = agenteGemini(historialModificado, objTools, objCodigo, objSystem, query, model_name, archivos_procesados, system_instruction)
+            streamingTexto = agenteGemini(historialModificado, objTools , objShots , objCodigo, objSystem, query, model_name, archivos_procesados, system_instruction)
         else:
-            streamingTexto = agenteChutes(historialModificado, objTools, objCodigo, objSystem, query, model_name, archivos_procesados, system_instruction)
+            streamingTexto = agenteChutes(historialModificado, objTools , objShots , objCodigo, objSystem, query, model_name, archivos_procesados, system_instruction)
 
         async for chunk in streamingTexto:
             #debug('chunk en agente gemini:')

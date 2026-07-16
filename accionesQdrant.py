@@ -11,6 +11,8 @@ from qdrant_client import AsyncQdrantClient
 from qdrant_client.http.models import Filter, FieldCondition, MatchValue, PointStruct, SparseVector, Prefetch, Fusion, FusionQuery
 from qdrant_client.http import models 
 from fastembed.sparse import SparseTextEmbedding
+from langsmith import traceable
+
 
 from accionesGemini import conectarGemini, generate_response, embed_with_gemini
 from funciones import debug
@@ -23,7 +25,7 @@ def conectarQdrant( qdrant_url, qdrant_api_key):
         api_key=qdrant_api_key 
     )
     return client
-
+@traceable(run_type="chain", name="RERANKER")
 async def rerank( query_usuario, candidatos, top_n):
         
     RERANK_KEY= os.environ.get('RERANK_KEY') 
@@ -139,6 +141,7 @@ class Qdrant:
         )
         return resultado
 
+    @traceable(run_type="chain", name="Search_in_QDRANT")
     async def search_in_qdrant(self, user_query, query_embedding, k, top_n):
         global sparse_model
         filtros = []

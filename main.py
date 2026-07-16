@@ -19,7 +19,7 @@ from accionesQdrant import Qdrant, conectarQdrant
 from accionesGemini import conectarGemini, generate_response, generate_response_streaming, embed_with_gemini
 from accionesChutes import  generate_response_chutes_streaming
 from funciones import debug
-from tools import sqlTools, codigoTools
+from tools import sqlTools, codigoTools, systemTools
 
 ADMIN_KEY = os.environ.get("ADMIN_API_KEY")
 def verificar_clave(api_key: str = Header(...)):
@@ -77,7 +77,7 @@ def optimizar_y_aplanar_historial(historial: Any, max_tokens: int):
     return historial_plano_final
 
 @traceable
-async def agenteGemini(historialModificado, objTools, objCodigo, query, model_name, archivos, system_instruction):
+async def agenteGemini(historialModificado, objTools, objCodigo, objSystem, query, model_name, archivos, system_instruction):
     historial_gemini = []
     for turno in historialModificado:
         # Gemini exige 'model' en lugar de 'assistant'
@@ -86,7 +86,13 @@ async def agenteGemini(historialModificado, objTools, objCodigo, query, model_na
             "role": rol_gemini,
             "parts": [turno["content"]]  
         })
-    lista_tools = [objTools.buscar_ejemplos_few_shots,objTools.buscar_conocimiento_base_datos, objTools.ejecutar_consulta_php]
+    lista_tools = [
+        objSystem.buscar_herramientas_personalizadas_php, 
+        objSystem.ejecutar_herramienta_personalizada_php, 
+        objTools.buscar_ejemplos_few_shots,
+        objTools.buscar_conocimiento_base_datos, 
+        objTools.ejecutar_consulta_php
+        ]
     if(objCodigo):
         lista_tools.append(objCodigo.buscar_conocimiento_fragmentos_codigo)
 
@@ -101,7 +107,7 @@ async def agenteGemini(historialModificado, objTools, objCodigo, query, model_na
         yield paso
 
 @traceable
-async def agenteChutes(historialModificado, objTools, objCodigo, query, model_name, archivos, system_instruction):
+async def agenteChutes(historialModificado, objTools, objCodigo, objSystem, query, model_name, archivos, system_instruction):
     historial_chutes = []
     for turno in historialModificado:
         rol_chutes = "assistant" if turno["role"] == "assistant" else "user"
@@ -111,6 +117,41 @@ async def agenteChutes(historialModificado, objTools, objCodigo, query, model_na
         })
 
     tools_schemas = [
+        {
+            "type": "function",
+            "function": {
+                "name": "buscar_herramientas_personalizadas_php",
+                "description": "Obtiene el catálogo completo de todas las funciones y herramientas personalizadas de negocio disponibles en el servidor PHP, incluyendo sus nombres, descripciones y los parámetros exactos requeridos para su ejecución.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {} 
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "ejecutar_herramienta_personalizada_php",
+                "description": "Ejecuta una función específica en el backend de PHP. PROHIBIDO: No inventes parámetros. Los argumentos enviados en el objeto 'argumentos' deben coincidir estrictamente con los tipos de datos y nombres requeridos por el contrato obtenido previamente mediante la herramienta 'buscar_herramientas_personalizadas_php'.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "nombre_funcion": {
+                            "type": "string",
+                            "description": "El nombre exacto de la función a ejecutar (ej: 'aplicar_descuento_lote')."
+                        },
+                        "argumentos": {
+                            "type": "object",
+                            "description": "Un objeto (JSON) con los parámetros requeridos por la función, tal como los especificó el catálogo."
+                        }
+                    },
+                    "required": [
+                        "nombre_funcion",
+                        "argumentos"
+                    ]
+                }
+            }
+        },
         {
             "type": "function",
             "function": {
@@ -263,9 +304,7 @@ async def devai_endpoint(request: Request):
             })
     #El historial lo aplanamos al numero de tokens que traemos por defecto
     historialModificado = optimizar_y_aplanar_historial(historial, max_tokens)
-    #debug('archivos_procesados')
-    #debug(archivos_procesados)
-    #Objetos de Qdrant para pasarselos a las tools. 
+ 
     objQdrant = Qdrant(
         client=client,  
         collection=bd,
@@ -283,30 +322,29 @@ async def devai_endpoint(request: Request):
         collection=codigo,
         proyecto=None
     )
-    #Objetos de tools, ya con el objeto de Qdrant para el tema de la collection.
+
+
+    #Objetos de tools, ya con el objeto de Qdrant para el tema de la collection y url para ejecutar la consulta en php.
     objTools = sqlTools(objQdrant=objQdrant, url=url)
     objCodigo = codigoTools(objQdrant=objQdrantCodigo)
-    
+    objSystem = systemTools(url=url)
+
     if(conCodigo == False):
         objCodigo = None
 
     queryAux = query
     query = f"<mainQuery>{query}</mainQuery"
-    debug(f"Proveedor: {proveedor} ")
-    debug(f"query: {query} ")
-    debug(f"model_name: {model_name} ")
+    
   
     async def generar_eventos_stream():
         tokens_entrada_acumulados = 0
         tokens_salida_acumulados = 0
         textoRespuesta = ""
         
-        
-
         if(proveedor == 'gemini'):
-            streamingTexto = agenteGemini(historialModificado, objTools, objCodigo, query, model_name, archivos_procesados, system_instruction)
+            streamingTexto = agenteGemini(historialModificado, objTools, objCodigo, objSystem, query, model_name, archivos_procesados, system_instruction)
         else:
-            streamingTexto = agenteChutes(historialModificado, objTools, objCodigo, query, model_name, archivos_procesados, system_instruction)
+            streamingTexto = agenteChutes(historialModificado, objTools, objCodigo, objSystem, query, model_name, archivos_procesados, system_instruction)
 
         async for chunk in streamingTexto:
             #debug('chunk en agente gemini:')

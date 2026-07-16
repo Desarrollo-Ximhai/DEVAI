@@ -25,10 +25,6 @@ async def embed_with_gemini(text, dimension=3072, tipo="retrieval_document"):
 
 @traceable(run_type="chain", name="Gemini_Agent_Stream")
 async def generate_response_streaming(prompt, model_name, archivos: list = None, configuracion = None, tools: list = None, system_instruction=None, history:list = None):
-    debug(f"modelo en generate: {model_name}")
-    debug('history en gemini:')
-    #debug(history)
-    debug(archivos)
     
     gen_config = {}
 
@@ -224,12 +220,12 @@ async def generate_response_streaming(prompt, model_name, archivos: list = None,
                     )
                     payload_actual.append(parte_error)
                     
-            debug("──────────────────────────────────────────────────\n")
+            # debug("──────────────────────────────────────────────────\n")
             # Continuamos el bucle "while" para que la IA procese 'payload_actual' (las respuestas de Python)
 
-        debug(f"--- Info de la petición Gemini (Agente) ---")
-        debug(f"Tokens Entrada Acumulados: {tokens_entrada_total} | Tokens Salida Acumulados: {tokens_salida_total}")
-        debug(f"───────────────────────────")
+        # debug(f"--- Info de la petición Gemini (Agente) ---")
+        # debug(f"Tokens Entrada Acumulados: {tokens_entrada_total} | Tokens Salida Acumulados: {tokens_salida_total}")
+        # debug(f"───────────────────────────")
         #debug(chainOfThought_history)
         yield {
             "type": "metrics",
@@ -249,7 +245,7 @@ async def generate_response_streaming(prompt, model_name, archivos: list = None,
             statusCode = e.code if hasattr(e, "code") else 500
             errorMessage = e.message if hasattr(e, "message") else str(e)
             
-            debug(f"❌ [GEMINI ERROR {statusCode}]: {errorMessage}")
+            #debug(f"❌ [GEMINI ERROR {statusCode}]: {errorMessage}")
             yield {
                 "type": "error",
                 "content": f"Error en el proveedor Gemini (HTTP {statusCode}): {errorMessage}"
@@ -278,13 +274,6 @@ async def generate_response_streaming(prompt, model_name, archivos: list = None,
         debug(f"--- Info de la petición (Modo Normal) ---")
         debug(f"Tokens Entrada: {tokens_entrada} | Tokens Salida: {tokens_salida}")
         debug(f"───────────────────────────")
-
-        # return {
-        #     "texto": response.text,
-        #     "tokens_entrada": tokens_entrada,
-        #     "tokens_salida": tokens_salida,
-        #     "status" : "success"
-        # }
 
 @traceable
 async def generate_response(prompt, model_name):

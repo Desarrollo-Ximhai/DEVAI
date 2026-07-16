@@ -206,3 +206,112 @@ class codigoTools:
             contexto_para_el_agente.append(texto_chunk)
             
         return "\n\n---\n\n".join(contexto_para_el_agente)
+
+class systemTools:
+    def __init__(self, url:str):
+        """
+        Recibe el dominio del servidor de php del sistema
+        """
+        self.url = url
+
+    @traceable(run_type="tool", name="Buscar_Herramientas_Personalizadas_PHP")
+    async def buscar_herramientas_personalizadas_php(self) -> str:
+        """
+        Busca en el servidor backend qué funciones o herramientas personalizadas de negocio están disponibles 
+        para ser ejecutadas, devolviendo sus nombres, descripciones y los parámetros exactos que requieren.
+        
+        OBLIGATORIO: Siempre debes usar esta herramienta antes de intentar ejecutar una acción 
+        en el sistema si no conoces el nombre exacto de la función y su esquema de parámetros.
+        
+        Args:
+            None
+        Returns:
+            JSON con el catálogo de funciones disponibles y el esquema (contrato) de sus parámetros.
+        """
+        debug(f"🔍 [Tool PHP] Buscando herramientas disponibles para:\n👉 {self.url}\n")
+        
+        headers = {
+            "Authorization": f"Bearer {XIMHAI_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        # Indicamos a PHP que solo queremos consultar el catálogo con payload vacio
+        payload = {
+            
+        }
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                # Reemplaza 'gateway_ia.php' con el nombre de tu endpoint ruteador
+                response = await client.post(f"{self.url}/funciones-devAI.php", json=payload, headers=headers, timeout=15.0)
+            
+            if response.status_code != 200:
+                return f"ERROR_SISTEMA: El servidor PHP respondió con código HTTP {response.status_code}. Detalle: {response.text}"
+            
+            data_php = response.json()
+            
+            if data_php.get("status") == "error":
+                return f"ERROR_CATALOGO_PHP: {data_php.get('message')}"
+                
+            resultados = data_php.get("resultado", [])
+            
+            if not resultados:
+                return "Este sistema no cuenta con herramientas PHP personalizadas. Intenta con otras tools."
+                
+            return json.dumps(resultados, ensure_ascii=False)
+            
+        except httpx.TimeoutException:
+            return "ERROR_TIMEOUT: El servidor PHP tardó demasiado en devolver el catálogo de herramientas."
+        except Exception as e:
+            return f"ERROR_CONEXION: No se pudo comunicar con el endpoint de PHP. Detalle: {str(e)}"
+
+    @traceable(run_type="tool", name="Ejecutar_Herramienta_Personalizada_PHP")
+    async def ejecutar_herramienta_personalizada_php(self, nombre_funcion: str, argumentos: dict) -> str:
+        """
+        Ejecuta una función específica en el backend de PHP. 
+        
+        PROHIBIDO: No inventes parámetros. Los argumentos enviados en el diccionario 'argumentos' 
+        deben coincidir estrictamente con los tipos de datos y nombres requeridos por el contrato 
+        obtenido previamente mediante la herramienta 'buscar_herramientas_personalizadas_php'.
+        
+        Args:
+            nombre_funcion: El nombre exacto de la función a ejecutar (ej: 'aplicar_descuento_lote').
+            argumentos: Un diccionario (JSON) con los parámetros requeridos por la función.
+        Returns:
+            JSON con el resultado de la ejecución exitosa o un string de error.
+        """
+        debug(f"🚀 [Tool PHP] Ejecutando la función '{nombre_funcion}' con argumentos:\n👉 {argumentos}\n")
+        
+        headers = {
+            "Authorization": f"Bearer {XIMHAI_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        # Indicamos a PHP que queremos ejecutar y pasamos la función y sus argumentos
+        payload = {
+            "accion": "ejecutar",
+            "funcion": nombre_funcion,
+            "argumentos": argumentos
+        }
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(f"{self.url}/funciones-devAI.php", json=payload, headers=headers, timeout=15.0)
+            
+            if response.status_code != 200:
+                return f"ERROR_SISTEMA: El servidor PHP respondió con código HTTP {response.status_code}. Detalle: {response.text}"
+            
+            data_php = response.json()
+            
+            if data_php.get("status") == "error":
+                return f"ERROR_EJECUCION_PHP: {data_php.get('message')}"
+                
+            # Asumiendo que tu PHP devuelve la respuesta final dentro de la llave "resultado"
+            resultados = data_php.get("resultado", {})
+            
+            return json.dumps(resultados, ensure_ascii=False)
+            
+        except httpx.TimeoutException:
+            return f"ERROR_TIMEOUT: La ejecución de la función '{nombre_funcion}' excedió el tiempo límite. Es posible que la operación se haya realizado, pero la confirmación falló."
+        except Exception as e:
+            return f"ERROR_CONEXION: No se pudo comunicar con el endpoint de PHP. Detalle: {str(e)}"

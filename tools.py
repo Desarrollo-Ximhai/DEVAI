@@ -158,7 +158,7 @@ class shotsTools:
     def __init__(self, objQdrant: Qdrant):
         """
         Recibe el motor de Qdrant ya configurado con el proyecto 
-        y la colección de la petición actual.
+        y la colección de la petición actual. 
         """
         self.ObjQdrant = objQdrant
         

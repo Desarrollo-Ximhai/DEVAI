@@ -295,7 +295,8 @@ async def devai_endpoint(request: Request):
     model_name = form_data.get("model_name", "models/gemini-3.1-flash-lite") 
     historial = form_data.get("historial", "")
     max_tokens = int(form_data.get("max_tokens", 6000))
-
+    guardarFewShot = form_data.get("fewShot", False)
+    
     #Por si vienen archivos
     archivos_procesados = []
     for key, value in form_data.items():
@@ -395,14 +396,16 @@ async def devai_endpoint(request: Request):
             chat_id=chat_id,
             proyecto=proyecto
         )
-        uuids = await objMemoria.guardarShot(
-            embed_fn=embed_with_gemini,
-            user_query=queryAux,
-            collection_memory="DevAI-FewShots",
-            cot = cot,
-            respuesta=textoRespuesta.strip(),
-            proyecto=proyecto
-        )
+
+        if(guardarFewShot):
+            uuids = await objMemoria.guardarShot(
+                embed_fn=embed_with_gemini,
+                user_query=queryAux,
+                collection_memory="DevAI-FewShots",
+                cot = cot,
+                respuesta=textoRespuesta.strip(),
+                proyecto=proyecto
+            )
 
         respuesta_final_metadata = {
             "type": "final_metadata",

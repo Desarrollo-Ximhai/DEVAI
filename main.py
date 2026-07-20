@@ -312,6 +312,8 @@ async def devai_endpoint(request: Request):
     KEY= os.environ.get(f"{proyecto}_KEY", 'KEY-FREE') 
     debug('KEY')
     debug(KEY)
+    if(KEY == 'KEY-FREE'):
+        KEY = GOOGLE_API_KEY
     conectarGemini(KEY)
 
     objQdrant = Qdrant(

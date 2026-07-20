@@ -281,7 +281,7 @@ async def generate_response_streaming(prompt, model_name, archivos: list = None,
         debug(f"───────────────────────────")
 
 @traceable
-async def generate_response(prompt, model_name):
+async def generate_response(prompt, model_name ="models/gemini-3.1-flash-lite"):
     gen_config = {}        
     gen_config['temperature'] = 0
     

@@ -307,7 +307,13 @@ async def devai_endpoint(request: Request):
             })
     #El historial lo aplanamos al numero de tokens que traemos por defecto
     historialModificado = optimizar_y_aplanar_historial(historial, max_tokens)
- 
+
+    
+    KEY= os.environ.get(f"{proyecto}_KEY", 'KEY-FREE') 
+    debug('KEY')
+    debug(KEY)
+    conectarGemini(KEY)
+
     objQdrant = Qdrant(
         client=client,  
         collection=bd,

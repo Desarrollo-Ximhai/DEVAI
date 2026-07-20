@@ -284,7 +284,7 @@ async def generate_response_streaming(prompt, model_name, archivos: list = None,
 async def generate_response(prompt, model_name ="models/gemini-3.1-flash-lite", json = False):
     gen_config = { }        
     gen_config['temperature'] = 0
-    if(json == True)
+    if(json == True):
         gen_config['response_mime_type'] = "application/json"
     
 

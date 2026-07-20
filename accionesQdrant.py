@@ -330,7 +330,7 @@ class Qdrant:
         """
 
         
-        respuesta = await generate_response(prompt)
+        respuesta = await generate_response(prompt, json=True)
         diccionario_descripciones = json.loads(respuesta["texto"])
         #return respuesta
         for chunk in chunks_base:

@@ -281,10 +281,11 @@ async def generate_response_streaming(prompt, model_name, archivos: list = None,
         debug(f"───────────────────────────")
 
 @traceable
-async def generate_response(prompt, model_name ="models/gemini-3.1-flash-lite"):
+async def generate_response(prompt, model_name ="models/gemini-3.1-flash-lite", json = False):
     gen_config = { }        
     gen_config['temperature'] = 0
-    gen_config['response_mime_type'] = "application/json"
+    if(json == True)
+        gen_config['response_mime_type'] = "application/json"
     
 
     chat_model = genai.GenerativeModel(model_name=model_name)

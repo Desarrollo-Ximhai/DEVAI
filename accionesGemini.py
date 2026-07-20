@@ -282,13 +282,16 @@ async def generate_response_streaming(prompt, model_name, archivos: list = None,
 
 @traceable
 async def generate_response(prompt, model_name):
-    debug(f"modelo en generate: {model_name}")
+    gen_config = {}        
+    gen_config['temperature'] = 0
+    
 
     chat_model = genai.GenerativeModel(model_name=model_name)
     contenidos_payload = [prompt]
     try:
         response = await chat_model.generate_content_async(
             contenidos_payload,
+            generation_config=gen_config
         )
     except googleExceptions.GoogleAPIError as e:
         statusCode = e.code if hasattr(e, "code") else 500

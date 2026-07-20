@@ -320,6 +320,10 @@ class Qdrant:
         Analiza este esquema SQL completo y entiende la lógica de negocio del sistema.
         Devuelve un objeto JSON estrictamente formateado donde las llaves sean los nombres de las tablas 
         y los valores sean las descripciones semánticas en español (qué hace la tabla y reglas de negocio deducidas).
+        
+        DESCRIPCIÓN GENERAL:
+        {descripcion}
+
 
         SQL COMPLETO:
         {sql_string}

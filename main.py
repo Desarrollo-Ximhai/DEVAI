@@ -478,11 +478,18 @@ async def endpoint_borrar_punto(request: BorrarPuntoRequest):
 
 @app.post("/nueva-bd", dependencies=[Depends(verificar_clave)])
 async def devai_endpoint(request: Request):
+    client = conectarQdrant(QDRANT_URL, QDRANT_API_KEY)
     form_data = await request.form()
     
     descripcion = form_data.get("descripcion", "")
     proyecto = form_data.get("proyecto", "")
     model_name = form_data.get("model_name", "models/gemini-3.1-flash-lite")
+
+    objQdrant = Qdrant(
+        client=client,  
+        collection='DevAI-DB',
+        proyecto=proyecto
+    )
 
     archivos_procesados = []
     for key, value in form_data.items():
@@ -494,5 +501,5 @@ async def devai_endpoint(request: Request):
                 "filename": value.filename
             })
     archivo = archivos_procesados[0]
-    respuesta =  await embebirBaseDatos(client, descripcion, archivo, proyecto)
+    respuesta =  await objQdrant.embebirBaseDatos(descripcion, archivo, proyecto)
     return {"response": respuesta}

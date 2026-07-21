@@ -61,7 +61,7 @@ async def generate_response_streaming(prompt, model_name, archivos: list = None,
 
         # Variables de control para el loop y métricas
         payload_actual = contenidos_payload
-        max_iterations = 10
+        max_iterations = 14
         interaciones_actuales = 0
         
         tokens_entrada_total = 0
@@ -121,7 +121,7 @@ async def generate_response_streaming(prompt, model_name, archivos: list = None,
                         # Notificamos de inmediato al frontend el paso de razonamiento (Chain of Thought)
                         yield {
                             "type": "thought", 
-                            "content": f"🧠 Usando la técnica: `{fc.name}`."
+                            "content": f"🧠 Buscando datos..."
                         }
             
                 # Si el chunk contiene texto y NO se han activado herramientas en esta llamada, es la respuesta definitiva
@@ -164,7 +164,7 @@ async def generate_response_streaming(prompt, model_name, archivos: list = None,
 
                 yield {
                     "type": "thought", 
-                    "content": f"🧠 Usando la herramienta `{func_name}`."
+                    "content": f"🧠 Usando herramientas..."
                 }
 
                 # Gemini usa la lista original de funciones de Python. La buscamos por su atributo __name__
@@ -182,7 +182,7 @@ async def generate_response_streaming(prompt, model_name, archivos: list = None,
 
                     yield {
                         "type": "thought", 
-                        "content": f"⚙️ Ejecuté: `{func_name}` con éxito. Viendo datos..."
+                        "content": f"⚙️ Ejecuté herramienta con éxito. Verificando datos..."
                     }
                     
                     # 1. Blindaje: Asegurar que el resultado SIEMPRE sea un diccionario (Struct de Protobuf lo requiere)

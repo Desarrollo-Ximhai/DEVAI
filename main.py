@@ -33,7 +33,6 @@ CHUTES_API_KEY= os.environ.get('CHUTES_API_KEY')
 
 conectarGemini(GOOGLE_API_KEY)
 
-@traceable
 def optimizar_y_aplanar_historial(historial: Any, max_tokens: int):
     """
     Parsea, limpia y aplana el historial sin importar si viene como 
@@ -359,9 +358,9 @@ async def devai_endpoint(request: Request):
         textoRespuesta = ""
         
         if(proveedor == 'gemini'):
-            streamingTexto = agenteGemini(historialModificado, objTools , objShots , objCodigo, objSystem, query, model_name, archivos_procesados, system_instruction)
+            streamingTexto = agenteGemini(historialModificado, objTools , objShots , objCodigo, objSystem, query, model_name, archivos_procesados, system_instruction, langsmith_extra={"name": f"agenteGemini{proyecto}"})
         else:
-            streamingTexto = agenteChutes(historialModificado, objTools , objShots , objCodigo, objSystem, query, model_name, archivos_procesados, system_instruction)
+            streamingTexto = agenteChutes(historialModificado, objTools , objShots , objCodigo, objSystem, query, model_name, archivos_procesados, system_instruction, langsmith_extra={"name": f"agenteChutes{proyecto}"})
 
         async for chunk in streamingTexto:
             #debug('chunk en agente gemini:')

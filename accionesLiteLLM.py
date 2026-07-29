@@ -92,6 +92,8 @@ async def generate_response_litellm_streaming(prompt: str, model_name: str, prox
             tool_calls_dict = {} 
 
             async for chunk in response_stream:
+                debug('UNchunk')
+                debug(chunk)
                 if chunk.usage:
                     tokens_entrada_total = chunk.usage.prompt_tokens
                     tokens_salida_total = chunk.usage.completion_tokens

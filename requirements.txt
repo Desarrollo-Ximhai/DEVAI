@@ -1,4 +1,4 @@
-pydantic==2.8.2
+pydantic
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
 qdrant-client==1.12.0

@@ -8,3 +8,4 @@ python-multipart==0.0.30
 fastembed==0.8.0
 openai
 langsmith
+litellm==1.93.0

@@ -94,11 +94,13 @@ async def generate_response_litellm_streaming(prompt: str, model_name: str, prox
             async for chunk in response_stream:
                 debug('UNchunk')
                 debug(chunk)
-                if chunk.usage:
+                usage = getattr(chunk, "usage", None)
+                if usage:
                     tokens_entrada_total = chunk.usage.prompt_tokens
                     tokens_salida_total = chunk.usage.completion_tokens
                 
-                if len(chunk.choices) > 0:
+                choices = getattr(chunk, "choices", [])
+                if len(choices) > 0:
                     delta = chunk.choices[0].delta
                     
                     # Texto normal
@@ -109,8 +111,8 @@ async def generate_response_litellm_streaming(prompt: str, model_name: str, prox
                             "content": delta.content
                         }
                     
-                    # Tool calls en streaming 
-                    if delta.tool_calls:
+                    delta_tool_calls = getattr(delta, "tool_calls", None)
+                    if delta_tool_calls:
                         for tc in delta.tool_calls:
                             idx = tc.index
                             if idx not in tool_calls_dict:

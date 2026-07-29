@@ -28,7 +28,7 @@ def verificar_clave(api_key: str = Header(...)):
         raise HTTPException(status_code=403, detail="No autorizado: Clave inválida")
 
 LITELLM_PROXY_KEY = os.environ["LITELLM_PROXY_KEY"]
-LITELLM_PROXY_KEY = os.environ["LITELLM_PROXY_KEY"]
+LITELLM_PROXY_URL = os.environ["LITELLM_PROXY_URL"]
 QDRANT_URL = os.environ["QDRANT_URL"]
 QDRANT_API_KEY = os.environ.get("QDRANT_API_KEY") 
 KEY_FREE2 = os.environ.get("GOOGLE_API_KEY2") 

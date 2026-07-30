@@ -1,3 +1,4 @@
+import ast
 import asyncio
 import base64
 import json
@@ -45,10 +46,31 @@ async def generate_response_litellm_streaming(prompt: str, model_name: str, prox
                     "text": f"\n\n--- Contenido de archivo adjunto ---\n{file_text}"
                 })
             elif mime_tipo.startswith("image/"):
+                
+                data_b64 = data
+                
+                # 1. Si los datos vienen como bytes puros, los convertimos a Base64
+                if isinstance(data, bytes):
+                    data_b64 = base64.b64encode(data).decode('utf-8')
+                    
+                # 2. Si los datos se convirtieron accidentalmente a string ("b'\x89...'") en algún paso previo
+                elif isinstance(data, str) and (data.startswith("b'") or data.startswith('b"')):
+                    try:
+                        # ast.literal_eval convierte el string "b'...'" de vuelta a bytes reales
+                        bytes_reales = ast.literal_eval(data)
+                        data_b64 = base64.b64encode(bytes_reales).decode('utf-8')
+                    except Exception as e:
+                        yield {
+                                "type": "error",
+                                "content": f"Error al recuperar bytes de la imagen: {e}"
+                            }
+                        print(f"Error al recuperar bytes de la imagen: {e}")
+                        
+                # Ahora sí, armamos la URL con Base64 puro
                 user_content.append({
                     "type": "image_url",
                     "image_url": {
-                        "url": f"data:{mime_tipo};base64,{data}"
+                        "url": f"data:{mime_tipo};base64,{data_b64}"
                     }
                 })
 
@@ -176,7 +198,7 @@ async def generate_response_litellm_streaming(prompt: str, model_name: str, prox
 
                 yield {
                     "type": "thought",
-                    "content": f"🧠 Usando la herramienta `{func_name}`."
+                    "content": f"🧠 Usando herramientas..."
                 }
 
                 if func_name in tool_functions:
@@ -189,7 +211,7 @@ async def generate_response_litellm_streaming(prompt: str, model_name: str, prox
                     
                     yield {
                         "type": "thought",
-                        "content": f"⚙️ Ejecuté: `{func_name}` con éxito."
+                        "content": f"⚙️ Ejecuté herramienta con éxito. Verificando datos..."
                     }
 
                     content_str = function_response if isinstance(function_response, str) else json.dumps(function_response, ensure_ascii=False)                    

@@ -18,6 +18,7 @@ import uvicorn
 from accionesQdrant import Qdrant, conectarQdrant
 from accionesGemini import conectarGemini, generate_response, generate_response_streaming, embed_with_gemini
 from accionesChutes import  generate_response_chutes_streaming
+from accionesLiteLLM import generate_response_litellm_streaming 
 from funciones import debug
 from tools import sqlTools, codigoTools, systemTools, shotsTools
 
@@ -25,6 +26,9 @@ ADMIN_KEY = os.environ.get("ADMIN_API_KEY")
 def verificar_clave(api_key: str = Header(...)):
     if api_key != ADMIN_KEY:
         raise HTTPException(status_code=403, detail="No autorizado: Clave inválida")
+
+LITELLM_PROXY_KEY = os.environ["LITELLM_PROXY_KEY"]
+LITELLM_PROXY_URL = os.environ["LITELLM_PROXY_URL"]
 QDRANT_URL = os.environ["QDRANT_URL"]
 QDRANT_API_KEY = os.environ.get("QDRANT_API_KEY") 
 KEY_FREE2 = os.environ.get("GOOGLE_API_KEY2") 
@@ -243,6 +247,143 @@ async def agenteChutes(historialModificado, objTools, objShots, objCodigo, objSy
     ):
         yield paso
 
+@traceable
+async def agenteLitellm(historialModificado, objTools, objShots, objCodigo, objSystem, query, model_name, archivos, system_instruction):
+    historial_litellm = []
+    for turno in historialModificado:
+        rol_litellm = "assistant" if turno["role"] == "assistant" else "user"
+        historial_litellm.append({
+            "role": rol_litellm,
+            "content": turno["content"]
+        })
+
+    tools_schemas = [
+        {
+            "type": "function",
+            "function": {
+                "name": "buscar_herramientas_personalizadas_php",
+                "description": "Obtiene el catálogo completo de todas las funciones y herramientas personalizadas de negocio disponibles en el servidor PHP, incluyendo sus nombres, descripciones y los parámetros exactos requeridos para su ejecución.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {} 
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "ejecutar_herramienta_personalizada_php",
+                "description": "Ejecuta una función específica en el backend de PHP. PROHIBIDO: No inventes parámetros. Los argumentos enviados en el objeto 'argumentos' deben coincidir estrictamente con los tipos de datos y nombres requeridos por el contrato obtenido previamente mediante la herramienta 'buscar_herramientas_personalizadas_php'.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "nombre_funcion": {
+                            "type": "string",
+                            "description": "El nombre exacto de la función a ejecutar (ej: 'aplicar_descuento_lote')."
+                        },
+                        "argumentos": {
+                            "type": "object",
+                            "description": "Un objeto (JSON) con los parámetros requeridos por la función, tal como los especificó el catálogo."
+                        }
+                    },
+                    "required": ["nombre_funcion", "argumentos"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "buscar_conocimiento_base_datos",
+                "description": "Busca esquemas de tablas, descripciones lógicas, relaciones de llaves foráneas y lógica de negocio en la base de datos del proyecto actual",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Términos o conceptos de negocio a buscar (ej: 'mantenimientos', 'pagos')."
+                        }
+                    },
+                    "required": ["query"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "ejecutar_consulta_php",
+                "description": "Ejecuta una consulta SQL estrictamente SELECT en el servidor de producción para recuperar filas de datos reales.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "sql": {
+                            "type": "string",
+                            "description": "Sentencia SQL SELECT limpia completa y válida (ej: 'SELECT nombre, saldo FROM clientes WHERE saldo > 10000 LIMIT 20;')."
+                        }
+                    },
+                    "required": ["sql"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "buscar_ejemplos_few_shots",
+                "description": "Busca ejemplos históricos (few-shots) de cómo el sistema ha resuelto exitosamente peticiones similares en el pasado. Útil para entender qué herramientas usar, cómo encadenarlas y cómo corregir errores SQL o lógicos.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "La intención o pregunta actual del usuario (ej: 'lista de lotes y dueños')."
+                        }
+                    },
+                    "required": ["query"]
+                }
+            }
+        }
+    ]
+    
+    tool_functions = {
+        "buscar_herramientas_personalizadas_php": objSystem.buscar_herramientas_personalizadas_php,
+        "ejecutar_herramienta_personalizada_php": objSystem.ejecutar_herramienta_personalizada_php,
+        "buscar_ejemplos_few_shots": objShots.buscar_ejemplos_few_shots,
+        "buscar_conocimiento_base_datos": objTools.buscar_conocimiento_base_datos,
+        "ejecutar_consulta_php": objTools.ejecutar_consulta_php,
+    }
+
+    if(objCodigo):
+        tools_schemas.append({
+            "type": "function",
+            "function": {
+                "name": "buscar_conocimiento_fragmentos_codigo",
+                "description": "Busca fragmentos de código, clases, métodos y controladores dentro del framework de desarrollo del usuario para entender cómo interactuar o programar con sus sistemas.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Concepto técnico, nombre de clase, método o funcionalidad a buscar en el código (ej: 'cómo usar la clase objAjuste', 'sintaxis de selects en el framework')."
+                        }
+                    },
+                    "required": ["query"]
+                }
+            }
+        })
+        tool_functions["buscar_conocimiento_fragmentos_codigo"] = objCodigo.buscar_conocimiento_fragmentos_codigo
+
+    # 🚀 Ejecutamos el streaming a través de LiteLLM
+    async for paso in generate_response_litellm_streaming(
+        prompt=query,
+        model_name=model_name,
+        proxy_key=LITELLM_PROXY_KEY, 
+        proxy_url=LITELLM_PROXY_URL, 
+        archivos=archivos,
+        tools_schemas=tools_schemas,
+        tool_functions=tool_functions,
+        system_instruction=system_instruction,
+        history=historial_litellm
+    ):
+        yield paso
 
 
 app = FastAPI()
@@ -359,6 +500,8 @@ async def devai_endpoint(request: Request):
         
         if(proveedor == 'gemini'):
             streamingTexto = agenteGemini(historialModificado, objTools , objShots , objCodigo, objSystem, query, model_name, archivos_procesados, system_instruction, langsmith_extra={"name": f"agenteGemini{proyecto}"})
+        elif (proveedor == 'litellm'):
+            streamingTexto = agenteLitellm(historialModificado, objTools , objShots , objCodigo, objSystem, query, model_name, archivos_procesados, system_instruction, langsmith_extra={"name": f"agenteLiteLLM{proyecto}"})
         else:
             streamingTexto = agenteChutes(historialModificado, objTools , objShots , objCodigo, objSystem, query, model_name, archivos_procesados, system_instruction, langsmith_extra={"name": f"agenteChutes{proyecto}"})
 

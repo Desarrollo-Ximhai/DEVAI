@@ -632,12 +632,14 @@ async def endpoint_borrar_punto(request: BorrarPuntoRequest):
 @app.post("/nueva-bd", dependencies=[Depends(verificar_clave)])
 async def devai_endpoint(request: Request):
     client = conectarQdrant(QDRANT_URL, QDRANT_API_KEY)
+    
+    
     form_data = await request.form()
     
     descripcion = form_data.get("descripcion", "")
     proyecto = form_data.get("proyecto", "")
-    model_name = form_data.get("model_name", "models/gemini-3.1-flash-lite")
-
+    model_name = form_data.get("model_name", "models/gemini-3.6-flash")
+    
     objQdrant = Qdrant(
         client=client,  
         collection='DevAI-DB',

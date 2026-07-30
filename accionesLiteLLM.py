@@ -176,7 +176,7 @@ async def generate_response_litellm_streaming(prompt: str, model_name: str, prox
 
                 yield {
                     "type": "thought",
-                    "content": f"🧠 Usando la herramienta `{func_name}`."
+                    "content": f"🧠 Usando herramientas..."
                 }
 
                 if func_name in tool_functions:
@@ -189,7 +189,7 @@ async def generate_response_litellm_streaming(prompt: str, model_name: str, prox
                     
                     yield {
                         "type": "thought",
-                        "content": f"⚙️ Ejecuté: `{func_name}` con éxito."
+                        "content": f"⚙️ Ejecuté herramienta con éxito. Verificando datos..."
                     }
 
                     content_str = function_response if isinstance(function_response, str) else json.dumps(function_response, ensure_ascii=False)                    

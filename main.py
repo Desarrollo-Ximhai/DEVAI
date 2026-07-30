@@ -497,11 +497,18 @@ async def devai_endpoint(request: Request):
         tokens_entrada_acumulados = 0
         tokens_salida_acumulados = 0
         textoRespuesta = ""
-        
+        extraInfo = {
+            "name": f"agenteLiteLLM{proyecto}" ,
+            "metadata": {
+                "chat_id": chat_id,
+                "modelo": model_name
+
+            }
+        }
         if(proveedor == 'gemini'):
             streamingTexto = agenteGemini(historialModificado, objTools , objShots , objCodigo, objSystem, query, model_name, archivos_procesados, system_instruction, langsmith_extra={"name": f"agenteGemini{proyecto}"})
         elif (proveedor == 'litellm'):
-            streamingTexto = agenteLitellm(historialModificado, objTools , objShots , objCodigo, objSystem, query, model_name, archivos_procesados, system_instruction, langsmith_extra={"name": f"agenteLiteLLM{proyecto}"})
+            streamingTexto = agenteLitellm(historialModificado, objTools , objShots , objCodigo, objSystem, query, model_name, archivos_procesados, system_instruction, langsmith_extra= extraInfo)
         else:
             streamingTexto = agenteChutes(historialModificado, objTools , objShots , objCodigo, objSystem, query, model_name, archivos_procesados, system_instruction, langsmith_extra={"name": f"agenteChutes{proyecto}"})
 

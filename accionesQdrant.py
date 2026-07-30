@@ -330,7 +330,7 @@ class Qdrant:
         """
 
         
-        respuesta = await generate_response(prompt, json=True)
+        respuesta = await generate_response(prompt, mode_name="models/gemini-3.6-flash", json=True)
         diccionario_descripciones = json.loads(respuesta["texto"])
         #return respuesta
         for chunk in chunks_base:

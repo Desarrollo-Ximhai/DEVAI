@@ -638,7 +638,6 @@ async def devai_endpoint(request: Request):
     
     descripcion = form_data.get("descripcion", "")
     proyecto = form_data.get("proyecto", "")
-    model_name = form_data.get("model_name", "models/gemini-3.6-flash")
     
     objQdrant = Qdrant(
         client=client,  

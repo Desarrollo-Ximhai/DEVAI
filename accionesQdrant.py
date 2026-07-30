@@ -344,24 +344,38 @@ class Qdrant:
                 chunk["metadata"]["description"] = descripcion_ia
                 
             chunks_de_base_datos.append(chunk)
+        
+        # chunks_with_embeddings = []
+        # for chunk in chunks_de_base_datos:
+        #     embedding = await embed_with_gemini(chunk["text"], 768, "retrieval_document")
+        #     chunk_with_embedding = {
+        #         "text": chunk['text'],
+        #         "metadata": chunk['metadata'],
+        #         "embedding": embedding
+        #     }
+        #     chunks_with_embeddings.append(chunk_with_embedding);
 
-        chunks_with_embeddings = []
-        for chunk in chunks_de_base_datos:
+
+        # ---------- EJECUCIÓN ASÍNCRONA CONCURRENTE ----------
+        async def fetch_embedding_for_chunk(chunk):
             embedding = await embed_with_gemini(chunk["text"], 768, "retrieval_document")
-            chunk_with_embedding = {
+            return {
                 "text": chunk['text'],
                 "metadata": chunk['metadata'],
                 "embedding": embedding
             }
-            chunks_with_embeddings.append(chunk_with_embedding);
-
+        
+        # Lanza todas las peticiones a la API al mismo tiempo
+        tareas = [fetch_embedding_for_chunk(chunk) for chunk in chunks_de_base_datos]
+        chunks_with_embeddings = await asyncio.gather(*tareas)
+        # -----------------------------------------------------
+        
         collection_name = "DevAI-DB"
         try:
             await self.client.delete(
                 collection_name=collection_name,
                 points_selector=models.Filter(
                     should=[
-                        # Opción A: El proyecto está en la raíz del payload
                         models.FieldCondition(
                             key="project",
                             match=models.MatchValue(value=proyecto)
@@ -420,8 +434,197 @@ class Qdrant:
 
         return True
 
-
 def chunk_schema(sql, relative_path, project):
+
+    chunks = []
+
+    # Limpieza: Comentarios de bloque y de línea
+    sql_clean = re.sub(r"/\*.*?\*/", "", sql, flags=re.DOTALL)
+    sql_clean = re.sub(r"--.*$", "", sql_clean, flags=re.MULTILINE)
+
+    # ---------- 1) CREATE TABLE ----------
+    table_pattern = re.compile(
+        r"(CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:`?(\w+)`?\.)?`?(\w+)`?\s*\(.*?\)\s*ENGINE\s*=\s*\w+.*?;)",
+        re.IGNORECASE | re.DOTALL
+    )
+
+    tables = {}
+
+    for match in table_pattern.finditer(sql_clean):
+        full_create = match.group(1).strip()
+        db_name = match.group(2)
+        table_name = match.group(3)
+
+        tables[table_name] = {
+            "db_name": db_name,
+            "create": full_create,
+            "columns": [],
+            "relations": []
+        }
+
+        chunks.append({
+            "text": full_create,
+            "metadata": {
+                "chunker": "chunk_schema",
+                "type": "table",
+                "project": project,
+                "path": relative_path,
+                "db_name": db_name,
+                "table": table_name,
+                "symbol": f"table:{table_name}"
+            }
+        })
+
+        # Extraer columnas
+        for line in full_create.splitlines():
+            line = line.strip().rstrip(",")
+            col_match = re.match(r"`(\w+)`\s+([A-Z]+(?:\([^)]+\))?)", line, re.IGNORECASE)
+            if col_match:
+                tables[table_name]["columns"].append({
+                    "name": col_match.group(1),
+                    "type": col_match.group(2)
+                })
+
+    # ---------- 2) FOREIGN KEYS EN ALTER TABLE ----------
+    # Ya no están anidados dentro del bucle de las columnas
+    alter_fk_pattern = re.compile(
+        r"ALTER\s+TABLE\s+(?:`?(\w+)`?\.)?`?(\w+)`?\s+(.*?);",
+        re.IGNORECASE | re.DOTALL
+    )
+
+    fk_in_alter_pattern = re.compile(
+        r"ADD\s+CONSTRAINT\s+`?(\w+)`?\s+FOREIGN\s+KEY\s+\(`?(\w+)`?\)\s+REFERENCES\s+(?:`?(\w+)`?\.)?`?(\w+)`?\s+\(`?(\w+)`?\)",
+        re.IGNORECASE
+    )
+    
+    seen_relations = set()
+
+    for alter_match in alter_fk_pattern.finditer(sql_clean):
+        db_name = alter_match.group(1)
+        table_name = alter_match.group(2)
+        alter_body = alter_match.group(3)
+
+        if table_name not in tables:
+            tables[table_name] = {
+                "db_name": db_name,
+                "create": "",
+                "columns": [],
+                "relations": []
+            }
+
+        for fk_match in fk_in_alter_pattern.finditer(alter_body):
+            constraint_name = fk_match.group(1)
+            column = fk_match.group(2)
+            ref_db = fk_match.group(3)
+            ref_table = fk_match.group(4)
+            ref_column = fk_match.group(5)
+
+            relation_key = (
+                table_name,
+                column,
+                ref_table,
+                ref_column,
+            )
+
+            if relation_key in seen_relations:
+                continue
+
+            seen_relations.add(relation_key)
+
+            tables[table_name]["relations"].append({
+                "constraint": constraint_name,
+                "column": column,
+                "ref_db": ref_db,
+                "ref_table": ref_table,
+                "ref_column": ref_column
+            })
+
+    # ---------- 3) Chunks de relaciones ----------
+    # Indentación corregida para procesar todas las tablas
+    for table_name, info in tables.items():
+        if not info["relations"]:
+            continue
+
+        relaciones_unicas = {}
+
+        for rel in info["relations"]:
+            key = (
+                table_name,
+                rel.get("column"),
+                rel.get("ref_table"),
+                rel.get("ref_column")
+            )
+            relaciones_unicas[key] = rel
+
+        lines = [f"Relaciones de la tabla `{table_name}`:"]
+
+        for rel in relaciones_unicas.values():
+            constraint = rel.get("constraint", "")
+            prefix = f"- Constraint `{constraint}`: " if constraint else "- "
+            lines.append(
+                f"{prefix}`{table_name}`.`{rel['column']}` referencia "
+                f"`{rel['ref_table']}`.`{rel['ref_column']}`"
+            )
+
+        chunks.append({
+            "text": "\n".join(lines),
+            "metadata": {
+                "chunker": "chunk_schema",
+                "type": "relationships",
+                "project": project,
+                "path": relative_path,
+                "db_name": info.get("db_name"),
+                "table": table_name,
+                "symbol": f"relationships:{table_name}"
+            }
+        })
+
+    # ---------- 4) CREATE VIEW ----------
+    view_pattern = re.compile(
+        r"(CREATE\s+(?:OR\s+REPLACE\s+)?VIEW\s+(?:`?(\w+)`?\.)?`?(\w+)`?\s+AS\s+.*?;)",
+        re.IGNORECASE | re.DOTALL
+    )
+
+    for match in view_pattern.finditer(sql_clean):
+        full_view = match.group(1).strip()
+        db_name = match.group(2)
+        view_name = match.group(3)
+
+        chunks.append({
+            "text": full_view,
+            "metadata": {
+                "chunker": "chunk_schema",
+                "type": "view",
+                "project": project,
+                "path": relative_path,
+                "db_name": db_name,
+                "view": view_name,
+                "symbol": f"view:{view_name}"
+            }
+        })
+
+    # ---------- 5) Resumen general ----------
+    if tables:
+        lines = [f"Resumen del schema del proyecto `{project}`:"]
+        for table_name, info in tables.items():
+            columnas = ", ".join([c["name"] for c in info["columns"][:20]])
+            extra = "..." if len(info["columns"]) > 20 else ""
+            lines.append(f"- `{table_name}`: columnas {columnas}{extra}")
+
+        chunks.append({
+            "text": "\n".join(lines),
+            "metadata": {
+                "chunker": "chunk_schema",
+                "type": "schema_summary",
+                "project": project,
+                "path": relative_path,
+                "symbol": f"schema_summary:{project}"
+            }
+        })
+
+    return chunks
+
+def chunk_schemaViejo(sql, relative_path, project):
 
     chunks = []
 

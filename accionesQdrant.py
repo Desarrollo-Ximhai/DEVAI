@@ -345,29 +345,29 @@ class Qdrant:
                 
             chunks_de_base_datos.append(chunk)
         
-        # chunks_with_embeddings = []
-        # for chunk in chunks_de_base_datos:
-        #     embedding = await embed_with_gemini(chunk["text"], 768, "retrieval_document")
-        #     chunk_with_embedding = {
-        #         "text": chunk['text'],
-        #         "metadata": chunk['metadata'],
-        #         "embedding": embedding
-        #     }
-        #     chunks_with_embeddings.append(chunk_with_embedding);
-
-
-        # ---------- EJECUCIÓN ASÍNCRONA CONCURRENTE ----------
-        async def fetch_embedding_for_chunk(chunk):
+        chunks_with_embeddings = []
+        for chunk in chunks_de_base_datos:
             embedding = await embed_with_gemini(chunk["text"], 768, "retrieval_document")
-            return {
+            chunk_with_embedding = {
                 "text": chunk['text'],
                 "metadata": chunk['metadata'],
                 "embedding": embedding
             }
+            chunks_with_embeddings.append(chunk_with_embedding);
+
+
+        # ---------- EJECUCIÓN ASÍNCRONA CONCURRENTE ----------
+        # async def fetch_embedding_for_chunk(chunk):
+        #     embedding = await embed_with_gemini(chunk["text"], 768, "retrieval_document")
+        #     return {
+        #         "text": chunk['text'],
+        #         "metadata": chunk['metadata'],
+        #         "embedding": embedding
+        #     }
         
-        # Lanza todas las peticiones a la API al mismo tiempo
-        tareas = [fetch_embedding_for_chunk(chunk) for chunk in chunks_de_base_datos]
-        chunks_with_embeddings = await asyncio.gather(*tareas)
+        # # Lanza todas las peticiones a la API al mismo tiempo
+        # tareas = [fetch_embedding_for_chunk(chunk) for chunk in chunks_de_base_datos]
+        # chunks_with_embeddings = await asyncio.gather(*tareas)
         # -----------------------------------------------------
         
         collection_name = "DevAI-DB"

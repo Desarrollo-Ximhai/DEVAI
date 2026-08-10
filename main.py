@@ -664,3 +664,37 @@ async def devai_endpoint(request: Request):
     archivo = archivos_procesados[0]
     respuesta =  await objQdrant.embebirBaseDatos(descripcion, archivo, proyecto)
     return {"response": respuesta}
+
+
+
+#
+# =================================================================
+# NUEVO APARTADO: Para embebir archivos
+# =================================================================
+@app.post("/nuevo-archivo", dependencies=[Depends(verificar_clave)])
+async def devai_endpoint(request: Request):
+    client = conectarQdrant(QDRANT_URL, QDRANT_API_KEY)
+    form_data = await request.form()
+    
+    descripcion = form_data.get("descripcion", "")
+    proyecto = form_data.get("proyecto", "")
+    model_name = form_data.get("model_name", "models/gemini-3.1-flash-lite")
+
+    objQdrant = Qdrant(
+        client=client,  
+        collection='DevAI-DB',
+        proyecto=proyecto
+    )
+
+    archivos_procesados = []
+    for key, value in form_data.items():
+        if key.startswith("files[") and hasattr(value, "filename"):
+            contenido_bytes = await value.read()
+            archivos_procesados.append({
+                "mime_type": value.content_type,   
+                "data": contenido_bytes,
+                "filename": value.filename
+            })
+    
+    respuesta =  await objQdrant.embebirArchivos(descripcion, archivos_procesados, proyecto)
+    return {"response": respuesta}

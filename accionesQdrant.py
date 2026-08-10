@@ -434,6 +434,141 @@ class Qdrant:
 
         return True
 
+    async def embebirArchivos(self, descripcion, archivos, proyecto):
+        debug('ARCHIVOS PROCESADOS')
+        debug(len(archivos))
+        return True
+        GOOGLE_API_KEY= os.environ.get('KEY-FREE') 
+        conectarGemini(GOOGLE_API_KEY)
+
+
+        archivos_procesados = []
+        chunks_de_base_datos = [] 
+        sql_string =  archivo["data"].decode("utf-8", errors="ignore")
+        chunks_base = chunk_schema(
+            sql_string, 
+            archivo["filename"], 
+            proyecto
+        )
+    
+        prompt = f"""
+        Analiza este esquema SQL completo y entiende la lógica de negocio del sistema.
+        Devuelve un objeto JSON estrictamente formateado donde las llaves sean los nombres de las tablas 
+        y los valores sean las descripciones semánticas en español (qué hace la tabla y reglas de negocio deducidas).
+
+        DESCRIPCIÓN GENERAL:
+        {descripcion}
+
+
+        SQL COMPLETO:
+        {sql_string}
+        """
+
+        
+        respuesta = await generate_response(prompt, "models/gemini-3.6-flash", json=True)
+        diccionario_descripciones = json.loads(respuesta["texto"])
+        #return respuesta
+        for chunk in chunks_base:
+            if chunk["metadata"]["type"] == "table":
+                tabla_nombre = chunk["metadata"]["table"]
+                
+                descripcion_ia = diccionario_descripciones.get(tabla_nombre, "")
+                sql_original = chunk["text"]
+
+                chunk["text"] = f"# TABLA: {tabla_nombre}\n**Descripción Lógica:** {descripcion_ia}\n\n## SQL ORIGINAL:\n{sql_original}"            
+                chunk["metadata"]["description"] = descripcion_ia
+                
+            chunks_de_base_datos.append(chunk)
+        
+        chunks_with_embeddings = []
+        for chunk in chunks_de_base_datos:
+            embedding = await embed_with_gemini(chunk["text"], 768, "retrieval_document")
+            chunk_with_embedding = {
+                "text": chunk['text'],
+                "metadata": chunk['metadata'],
+                "embedding": embedding
+            }
+            chunks_with_embeddings.append(chunk_with_embedding);
+
+
+        # ---------- EJECUCIÓN ASÍNCRONA CONCURRENTE ----------
+        # async def fetch_embedding_for_chunk(chunk):
+        #     embedding = await embed_with_gemini(chunk["text"], 768, "retrieval_document")
+        #     return {
+        #         "text": chunk['text'],
+        #         "metadata": chunk['metadata'],
+        #         "embedding": embedding
+        #     }
+        
+        # # Lanza todas las peticiones a la API al mismo tiempo
+        # tareas = [fetch_embedding_for_chunk(chunk) for chunk in chunks_de_base_datos]
+        # chunks_with_embeddings = await asyncio.gather(*tareas)
+        # -----------------------------------------------------
+        
+        collection_name = "DevAI-DB"
+        try:
+            await self.client.delete(
+                collection_name=collection_name,
+                points_selector=models.Filter(
+                    should=[
+                        models.FieldCondition(
+                            key="project",
+                            match=models.MatchValue(value=proyecto)
+                        ),
+                    
+                    ]
+                )
+            )
+        except Exception as e:
+            debug(f"[⚠️ ADVERTENCIA] No se pudo borrar o no existían puntos previos: {e}")
+
+        points = []
+        
+        for chunk_data in chunks_with_embeddings:
+            if chunk_data['embedding'] is not None:
+                
+                payload = {
+                    "text": chunk_data['text'],
+                    "metadata": chunk_data['metadata'],
+                    "project": proyecto 
+                }
+
+                # Procesar Vector Disperso (BM25)
+                sparse_embeddings = list(sparse_model.embed([chunk_data['text']]))
+                sparse_emb = sparse_embeddings[0]
+                qdrant_sparse_vector = SparseVector(
+                    indices=sparse_emb.indices.tolist(),
+                    values=sparse_emb.values.tolist()
+                )
+
+                vector_hibrido = {
+                    "": chunk_data['embedding'],           
+                    "text-sparse": qdrant_sparse_vector   
+                }
+
+                punto_id = str(uuid.uuid4())
+
+                points.append(
+                    PointStruct(
+                        id=punto_id,
+                        vector=vector_hibrido,
+                        payload=payload
+                    )
+                )
+
+        try:
+            await self.client.upsert(
+                collection_name=collection_name,
+                wait=True,
+                points=points
+            )
+            debug(f"✅ Se han subido exitosamente {len(points)} chunks actualizados a la colección '{collection_name}'.")
+        except Exception as e:
+            debug(f"[ERROR CRÍTICO] al subir los chunks a Qdrant: {e}")
+
+
+        return True
+
 def chunk_schema(sql, relative_path, project):
 
     chunks = []

@@ -7,6 +7,7 @@ import os
 import re
 import uuid
 
+import fitz  
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http.models import Filter, FieldCondition, MatchValue, PointStruct, SparseVector, Prefetch, Fusion, FusionQuery
 from qdrant_client.http import models 
@@ -437,75 +438,45 @@ class Qdrant:
     async def embebirArchivos(self, descripcion, archivos, proyecto):
         debug('ARCHIVOS PROCESADOS')
         debug(len(archivos))
-        return True
-        GOOGLE_API_KEY= os.environ.get('KEY-FREE') 
+        
+        GOOGLE_API_KEY = os.environ.get('KEY-FREE') 
         conectarGemini(GOOGLE_API_KEY)
 
+        chunks_totales = []
 
-        archivos_procesados = []
-        chunks_de_base_datos = [] 
-        sql_string =  archivo["data"].decode("utf-8", errors="ignore")
-        chunks_base = chunk_schema(
-            sql_string, 
-            archivo["filename"], 
-            proyecto
-        )
-    
-        prompt = f"""
-        Analiza este esquema SQL completo y entiende la lógica de negocio del sistema.
-        Devuelve un objeto JSON estrictamente formateado donde las llaves sean los nombres de las tablas 
-        y los valores sean las descripciones semánticas en español (qué hace la tabla y reglas de negocio deducidas).
+        # 1. Iterar sobre todos los archivos recibidos y chunkearlos
+        for archivo in archivos:
+            # Para PDFs, NO decodificamos a utf-8. Pasamos los bytes puros.
+            pdf_bytes = archivo["data"] 
+            filename = archivo["filename"]
+            
+            # Llamamos a nuestro nuevo método de chunking para PDFs
+            chunks_pdf = chunk_pdf_document(
+                pdf_bytes=pdf_bytes, 
+                relative_path=filename, 
+                project=proyecto
+            )
+            chunks_totales.extend(chunks_pdf)
 
-        DESCRIPCIÓN GENERAL:
-        {descripcion}
+        debug(f"Total de chunks generados a partir de los PDFs: {len(chunks_totales)}")
 
-
-        SQL COMPLETO:
-        {sql_string}
-        """
-
-        
-        respuesta = await generate_response(prompt, "models/gemini-3.6-flash", json=True)
-        diccionario_descripciones = json.loads(respuesta["texto"])
-        #return respuesta
-        for chunk in chunks_base:
-            if chunk["metadata"]["type"] == "table":
-                tabla_nombre = chunk["metadata"]["table"]
-                
-                descripcion_ia = diccionario_descripciones.get(tabla_nombre, "")
-                sql_original = chunk["text"]
-
-                chunk["text"] = f"# TABLA: {tabla_nombre}\n**Descripción Lógica:** {descripcion_ia}\n\n## SQL ORIGINAL:\n{sql_original}"            
-                chunk["metadata"]["description"] = descripcion_ia
-                
-            chunks_de_base_datos.append(chunk)
-        
-        chunks_with_embeddings = []
-        for chunk in chunks_de_base_datos:
+        # 2. ---------- EJECUCIÓN ASÍNCRONA CONCURRENTE (ACTIVADA) ----------
+        async def fetch_embedding_for_chunk(chunk):
             embedding = await embed_with_gemini(chunk["text"], 768, "retrieval_document")
-            chunk_with_embedding = {
+            return {
                 "text": chunk['text'],
                 "metadata": chunk['metadata'],
                 "embedding": embedding
             }
-            chunks_with_embeddings.append(chunk_with_embedding);
-
-
-        # ---------- EJECUCIÓN ASÍNCRONA CONCURRENTE ----------
-        # async def fetch_embedding_for_chunk(chunk):
-        #     embedding = await embed_with_gemini(chunk["text"], 768, "retrieval_document")
-        #     return {
-        #         "text": chunk['text'],
-        #         "metadata": chunk['metadata'],
-        #         "embedding": embedding
-        #     }
         
-        # # Lanza todas las peticiones a la API al mismo tiempo
-        # tareas = [fetch_embedding_for_chunk(chunk) for chunk in chunks_de_base_datos]
-        # chunks_with_embeddings = await asyncio.gather(*tareas)
-        # -----------------------------------------------------
+        # Disparamos todas las peticiones a Gemini al mismo tiempo
+        tareas = [fetch_embedding_for_chunk(chunk) for chunk in chunks_totales]
+        chunks_with_embeddings = await asyncio.gather(*tareas)
+        # -------------------------------------------------------------------
+
+        collection_name = "DevAI-Analisis"
         
-        collection_name = "DevAI-DB"
+        # 3. Limpieza de documentos viejos del mismo proyecto en Qdrant
         try:
             await self.client.delete(
                 collection_name=collection_name,
@@ -515,15 +486,14 @@ class Qdrant:
                             key="project",
                             match=models.MatchValue(value=proyecto)
                         ),
-                    
                     ]
                 )
             )
         except Exception as e:
             debug(f"[⚠️ ADVERTENCIA] No se pudo borrar o no existían puntos previos: {e}")
 
+        # 4. Preparación de vectores híbridos y subida a Qdrant
         points = []
-        
         for chunk_data in chunks_with_embeddings:
             if chunk_data['embedding'] is not None:
                 
@@ -534,6 +504,7 @@ class Qdrant:
                 }
 
                 # Procesar Vector Disperso (BM25)
+                # (Asegúrate de que sparse_model esté inicializado en el alcance de tu clase)
                 sparse_embeddings = list(sparse_model.embed([chunk_data['text']]))
                 sparse_emb = sparse_embeddings[0]
                 qdrant_sparse_vector = SparseVector(
@@ -541,6 +512,7 @@ class Qdrant:
                     values=sparse_emb.values.tolist()
                 )
 
+                # Vector Híbrido (Denso + Disperso)
                 vector_hibrido = {
                     "": chunk_data['embedding'],           
                     "text-sparse": qdrant_sparse_vector   
@@ -556,6 +528,7 @@ class Qdrant:
                     )
                 )
 
+        # 5. Upsert final a la base de datos
         try:
             await self.client.upsert(
                 collection_name=collection_name,
@@ -565,7 +538,6 @@ class Qdrant:
             debug(f"✅ Se han subido exitosamente {len(points)} chunks actualizados a la colección '{collection_name}'.")
         except Exception as e:
             debug(f"[ERROR CRÍTICO] al subir los chunks a Qdrant: {e}")
-
 
         return True
 
@@ -757,6 +729,86 @@ def chunk_schema(sql, relative_path, project):
             }
         })
 
+    return chunks
+
+
+def chunk_pdf_document(pdf_bytes, relative_path, project, chunk_size=800, overlap=150):
+    """
+    Procesa un archivo PDF en bytes, extrae su estructura jerárquica
+    y genera chunks enriquecidos con metadata de contexto (página, títulos, proyecto).
+    """
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    chunks = []
+    
+    current_section = "Introducción / General"
+    full_document_summary = []
+
+    # Regex para identificar posibles títulos/secciones en el texto
+    # (Líneas cortas en mayúsculas o con numeraciones como "1.2 Uso de Logo")
+    header_pattern = re.compile(r"^(?:[0-9]+\.|\b[A-ZÁÉÍÓÚÑ\s]{4,}\b)", re.MULTILINE)
+
+    for page_num in range(len(doc)):
+        page = doc[page_num]
+        text = page.get_text("text").strip()
+
+        if not text:
+            continue
+
+        # Detectar si la página inicia con una nueva sección
+        lines = text.split("\n")
+        first_line = lines[0].strip() if lines else ""
+        
+        if len(first_line) < 60 and (header_pattern.match(first_line) or first_line.isupper()):
+            current_section = first_line
+
+        full_document_summary.append(f"Pág {page_num + 1}: {first_line[:40]}...")
+
+        # Split semántico por tamaño de caracteres con ventana deslizante (Overlap)
+        words = text.split()
+        start = 0
+
+        while start < len(words):
+            end = start + chunk_size
+            chunk_words = words[start:end]
+            chunk_text = " ".join(chunk_words)
+
+            chunks.append({
+                "text": chunk_text,
+                "metadata": {
+                    "chunker": "chunk_pdf_document",
+                    "type": "content_chunk",
+                    "project": project,
+                    "path": relative_path,
+                    "page": page_num + 1,
+                    "section": current_section,
+                    "total_pages": len(doc),
+                    "symbol": f"doc:{project}:p{page_num + 1}"
+                }
+            })
+
+            # Avanzamos aplicando el traslape (overlap) para mantener contexto
+            start += (chunk_size - overlap)
+
+    # ---------- Resumen General del PDF ----------
+    if chunks:
+        resumen_texto = f"Resumen del documento PDF `{relative_path}` ({len(doc)} páginas):\n"
+        resumen_texto += "\n".join(full_document_summary[:30]) # Primeras 30 referencias
+        if len(full_document_summary) > 30:
+            resumen_texto += "\n..."
+
+        chunks.append({
+            "text": resumen_texto,
+            "metadata": {
+                "chunker": "chunk_pdf_document",
+                "type": "doc_summary",
+                "project": project,
+                "path": relative_path,
+                "total_pages": len(doc),
+                "symbol": f"doc_summary:{project}"
+            }
+        })
+
+    doc.close()
     return chunks
 
 def chunk_schemaViejo(sql, relative_path, project):

@@ -55,6 +55,77 @@ class sqlTools:
         return "\n\n---\n\n".join(contexto_para_el_agente)
 
 
+
+
+
+
+# =================================================================
+# Clase para tools de base de datos, para poder instanciar desde main
+# =================================================================
+class fileTools:
+    def __init__(self, objQdrant: Qdrant):
+        """
+        Recibe el motor de Qdrant ya configurado con el proyecto 
+        y la colección de la petición actual.
+        """
+        self.ObjQdrant = objQdrant
+
+# =================================================================
+# Busqueda en QDRANT
+# =================================================================
+    @traceable(run_type="tool", name="Ejecutar_Herramienta_QDFILE")
+    async def buscar_conocimiento_archivos(self, query: str) -> str:
+        """
+        Busca información relevante en los manuales de marca, documentos PDF, 
+        políticas, servicios e información general del negocio del proyecto actual.
+        
+        Args:
+            query: Términos, preguntas o conceptos a buscar (ej: "uso de logo", "horarios", "garantía", "servicios").
+        Returns:
+            Un string en formato Markdown con los fragmentos de documentos más relevantes encontrados y su ubicación.
+        """
+        debug(f"🔍 Buscando en documentos con tool: '{query}'")
+
+        # 1. Embedding de la consulta
+        query_embedding768 = await embed_with_gemini(query, 768, tipo="retrieval_query")
+        if query_embedding768 is None:
+            return "Error al generar el embedding de la consulta."
+
+        # 2. Búsqueda híbrida en Qdrant
+        puntos_ganadores = await self.ObjQdrant.search_in_qdrant(
+            user_query=query, 
+            query_embedding=query_embedding768, 
+            k=40, 
+            top_n=20
+        )
+        
+        # 3. Validación si no hubo coincidencias
+        if not puntos_ganadores:
+            return "No se encontró información relevante sobre este tema en los documentos cargados del negocio."
+
+        # 4. Formatear el contexto inyectando metadatos visibles para la IA
+        contexto_para_el_agente = []
+        
+        for p in puntos_ganadores:
+            payload = p.payload
+            texto_chunk = payload.get("text", "")
+            metadata = payload.get("metadata", {})
+            
+            # Extraemos la ubicación original que guardamos en la fase de chunking
+            pagina = metadata.get("page", "N/A")
+            seccion = metadata.get("section", "General")
+            archivo = metadata.get("path", "Documento")
+
+            # Inyectamos una cabecera a cada fragmento
+            chunk_formateado = (
+                f"--- FUENTE: {archivo} (Pág. {pagina} | Sección: {seccion}) ---\n"
+                f"{texto_chunk}"
+            )
+            contexto_para_el_agente.append(chunk_formateado)
+            
+        return "\n\n".join(contexto_para_el_agente)
+
+
 # =================================================================
 # Hacer request a PHP
 # =================================================================}

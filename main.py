@@ -248,7 +248,7 @@ async def agenteChutes(historialModificado, objTools, objShots, objCodigo, objSy
         yield paso
 
 @traceable
-async def agenteLitellm(historialModificado, objTools, objShots, objCodigo, objSystem, query, model_name, archivos, system_instruction):
+async def agenteLitellm(historialModificado, objTools, objShots, objCodigo, objFile, objSystem, query, model_name, archivos, system_instruction):
     historial_litellm = []
     for turno in historialModificado:
         rol_litellm = "assistant" if turno["role"] == "assistant" else "user"
@@ -371,6 +371,26 @@ async def agenteLitellm(historialModificado, objTools, objShots, objCodigo, objS
         })
         tool_functions["buscar_conocimiento_fragmentos_codigo"] = objCodigo.buscar_conocimiento_fragmentos_codigo
 
+    if(objFile):
+        tools_schemas.append({
+            "type": "function",
+            "function": {
+                "name": "buscar_conocimiento_archivos",
+                "description": "Busca información relevante en los manuales de marca, documentos PDF, políticas, servicios e información general del negocio del proyecto actual.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Términos, preguntas o conceptos a buscar (ej: 'uso de logo', 'horarios', 'garantía', 'servicios')."
+                        }
+                    },
+                    "required": ["query"]
+                }
+            }
+        },)
+        tool_functions["buscar_conocimiento_archivos"] = objFile.buscar_conocimiento_archivos
+
     # 🚀 Ejecutamos el streaming a través de LiteLLM
     async for paso in generate_response_litellm_streaming(
         prompt=query,
@@ -431,6 +451,7 @@ async def devai_endpoint(request: Request):
     system_instruction = form_data.get("system_instruction", default_system_instruction)
     url = form_data.get("url", "https://ximhai.com")
     conCodigo = form_data.get("conCodigo", False)
+    conArchivos = form_data.get("conArchivos", False)
     
     model_name = form_data.get("model_name", "models/gemini-3.1-flash-lite") 
     historial = form_data.get("historial", "")
@@ -479,15 +500,24 @@ async def devai_endpoint(request: Request):
         proyecto=None
     )
 
+    objQdrantFile = Qdrant(
+        client=client,  
+        collection=archivo,
+        proyecto=proyecto
+    )
+
 
     #Objetos de tools, ya con el objeto de Qdrant para el tema de la collection y url para ejecutar la consulta en php.
     objTools = sqlTools(objQdrant=objQdrant, url=url)
     objShots = shotsTools(objQdrant=objShotsQ)
     objCodigo = codigoTools(objQdrant=objQdrantCodigo)
+    objFile = fileTools(objQdrant=objQdrantFile)
     objSystem = systemTools(url=url)
 
     if(conCodigo == False):
         objCodigo = None
+    if(conArchivos == False):
+        objFile = None
 
     queryAux = query
     query = f"<mainQuery>{query}</mainQuery"
@@ -508,7 +538,7 @@ async def devai_endpoint(request: Request):
         if(proveedor == 'gemini'):
             streamingTexto = agenteGemini(historialModificado, objTools , objShots , objCodigo, objSystem, query, model_name, archivos_procesados, system_instruction, langsmith_extra={"name": f"agenteGemini{proyecto}"})
         elif (proveedor == 'litellm'):
-            streamingTexto = agenteLitellm(historialModificado, objTools , objShots , objCodigo, objSystem, query, model_name, archivos_procesados, system_instruction, langsmith_extra= extraInfo)
+            streamingTexto = agenteLitellm(historialModificado, objTools , objShots , objCodigo, objFile, objSystem, query, model_name, archivos_procesados, system_instruction, langsmith_extra= extraInfo)
         else:
             streamingTexto = agenteChutes(historialModificado, objTools , objShots , objCodigo, objSystem, query, model_name, archivos_procesados, system_instruction, langsmith_extra={"name": f"agenteChutes{proyecto}"})
 

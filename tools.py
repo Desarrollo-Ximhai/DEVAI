@@ -151,8 +151,8 @@ class fileTools:
         puntos_ganadores = await self.ObjQdrant.search_in_qdrant(
             user_query=query, 
             query_embedding=query_embedding768, 
-            k=40, 
-            top_n=20
+            k=30, 
+            top_n=5
         )
         
         # 3. Validación si no hubo coincidencias

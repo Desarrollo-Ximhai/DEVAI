@@ -20,7 +20,7 @@ from accionesGemini import conectarGemini, generate_response, generate_response_
 from accionesChutes import  generate_response_chutes_streaming
 from accionesLiteLLM import generate_response_litellm_streaming 
 from funciones import debug
-from tools import sqlTools, codigoTools, systemTools, shotsTools
+from tools import sqlTools, codigoTools, systemTools, shotsTools, fileTools
 
 ADMIN_KEY = os.environ.get("ADMIN_API_KEY")
 def verificar_clave(api_key: str = Header(...)):
@@ -248,7 +248,7 @@ async def agenteChutes(historialModificado, objTools, objShots, objCodigo, objSy
         yield paso
 
 @traceable
-async def agenteLitellm(historialModificado, objTools, objShots, objCodigo, objSystem, query, model_name, archivos, system_instruction):
+async def agenteLitellm(historialModificado, objTools, objShots, objCodigo, objFile, objSystem, query, model_name, archivos, system_instruction):
     historial_litellm = []
     for turno in historialModificado:
         rol_litellm = "assistant" if turno["role"] == "assistant" else "user"
@@ -371,6 +371,26 @@ async def agenteLitellm(historialModificado, objTools, objShots, objCodigo, objS
         })
         tool_functions["buscar_conocimiento_fragmentos_codigo"] = objCodigo.buscar_conocimiento_fragmentos_codigo
 
+    if(objFile):
+        tools_schemas.append({
+            "type": "function",
+            "function": {
+                "name": "buscar_conocimiento_archivos",
+                "description": "Busca información relevante en los manuales de marca, documentos PDF, políticas, servicios e información general del negocio del proyecto actual.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Términos, preguntas o conceptos a buscar (ej: 'uso de logo', 'horarios', 'garantía', 'servicios')."
+                        }
+                    },
+                    "required": ["query"]
+                }
+            }
+        },)
+        tool_functions["buscar_conocimiento_archivos"] = objFile.buscar_conocimiento_archivos
+
     # 🚀 Ejecutamos el streaming a través de LiteLLM
     async for paso in generate_response_litellm_streaming(
         prompt=query,
@@ -431,6 +451,7 @@ async def devai_endpoint(request: Request):
     system_instruction = form_data.get("system_instruction", default_system_instruction)
     url = form_data.get("url", "https://ximhai.com")
     conCodigo = form_data.get("conCodigo", False)
+    conArchivos = form_data.get("conArchivos", False)
     
     model_name = form_data.get("model_name", "models/gemini-3.1-flash-lite") 
     historial = form_data.get("historial", "")
@@ -479,15 +500,24 @@ async def devai_endpoint(request: Request):
         proyecto=None
     )
 
+    objQdrantFile = Qdrant(
+        client=client,  
+        collection=archivo,
+        proyecto=proyecto
+    )
+
 
     #Objetos de tools, ya con el objeto de Qdrant para el tema de la collection y url para ejecutar la consulta en php.
     objTools = sqlTools(objQdrant=objQdrant, url=url)
     objShots = shotsTools(objQdrant=objShotsQ)
     objCodigo = codigoTools(objQdrant=objQdrantCodigo)
+    objFile = fileTools(objQdrant=objQdrantFile)
     objSystem = systemTools(url=url)
 
     if(conCodigo == False):
         objCodigo = None
+    if(conArchivos == False):
+        objFile = None
 
     queryAux = query
     query = f"<mainQuery>{query}</mainQuery"
@@ -497,11 +527,18 @@ async def devai_endpoint(request: Request):
         tokens_entrada_acumulados = 0
         tokens_salida_acumulados = 0
         textoRespuesta = ""
-        
+        extraInfo = {
+            "name": f"agenteLiteLLM{proyecto}" ,
+            "metadata": {
+                "chat_id": chat_id,
+                "modelo": model_name
+
+            }
+        }
         if(proveedor == 'gemini'):
             streamingTexto = agenteGemini(historialModificado, objTools , objShots , objCodigo, objSystem, query, model_name, archivos_procesados, system_instruction, langsmith_extra={"name": f"agenteGemini{proyecto}"})
         elif (proveedor == 'litellm'):
-            streamingTexto = agenteLitellm(historialModificado, objTools , objShots , objCodigo, objSystem, query, model_name, archivos_procesados, system_instruction, langsmith_extra={"name": f"agenteLiteLLM{proyecto}"})
+            streamingTexto = agenteLitellm(historialModificado, objTools , objShots , objCodigo, objFile, objSystem, query, model_name, archivos_procesados, system_instruction, langsmith_extra= extraInfo)
         else:
             streamingTexto = agenteChutes(historialModificado, objTools , objShots , objCodigo, objSystem, query, model_name, archivos_procesados, system_instruction, langsmith_extra={"name": f"agenteChutes{proyecto}"})
 
@@ -632,6 +669,41 @@ async def endpoint_borrar_punto(request: BorrarPuntoRequest):
 @app.post("/nueva-bd", dependencies=[Depends(verificar_clave)])
 async def devai_endpoint(request: Request):
     client = conectarQdrant(QDRANT_URL, QDRANT_API_KEY)
+    
+    
+    form_data = await request.form()
+    
+    descripcion = form_data.get("descripcion", "")
+    proyecto = form_data.get("proyecto", "")
+    
+    objQdrant = Qdrant(
+        client=client,  
+        collection='DevAI-DB',
+        proyecto=proyecto
+    )
+
+    archivos_procesados = []
+    for key, value in form_data.items():
+        if key.startswith("files[") and hasattr(value, "filename"):
+            contenido_bytes = await value.read()
+            archivos_procesados.append({
+                "mime_type": value.content_type,   
+                "data": contenido_bytes,
+                "filename": value.filename
+            })
+    archivo = archivos_procesados[0]
+    respuesta =  await objQdrant.embebirBaseDatos(descripcion, archivo, proyecto)
+    return {"response": respuesta}
+
+
+
+#
+# =================================================================
+# NUEVO APARTADO: Para embebir archivos
+# =================================================================
+@app.post("/nuevo-archivo", dependencies=[Depends(verificar_clave)])
+async def devai_endpoint(request: Request):
+    client = conectarQdrant(QDRANT_URL, QDRANT_API_KEY)
     form_data = await request.form()
     
     descripcion = form_data.get("descripcion", "")
@@ -653,6 +725,6 @@ async def devai_endpoint(request: Request):
                 "data": contenido_bytes,
                 "filename": value.filename
             })
-    archivo = archivos_procesados[0]
-    respuesta =  await objQdrant.embebirBaseDatos(descripcion, archivo, proyecto)
+    
+    respuesta =  await objQdrant.embebirArchivos(descripcion, archivos_procesados, proyecto)
     return {"response": respuesta}

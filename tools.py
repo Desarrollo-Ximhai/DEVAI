@@ -57,7 +57,63 @@ class sqlTools:
 
 
 
+# =================================================================
+# Hacer request a PHP
+# =================================================================}
+    @traceable(run_type="tool", name="Ejecutar_Herramienta_PHPSQL")
+    async def ejecutar_consulta_php(self, sql: str) -> str:
+        """
+        Ejecuta exclusivamente sentencias SQL de tipo SELECT para recuperar datos reales de las filas.
+        
+        PROHIBIDO: No intentes usar comandos de inspección de esquemas como DESCRIBE, SHOW TABLES, 
+        SHOW COLUMNS, EXPLAIN o similares. Si no conoces el nombre de una tabla o columna, es obligatorio 
+        que uses primero la herramienta 'buscar_conocimiento_base_datos' para conocer el esquema.
+        
+        Args:
+            sql: Sentencia SQL que inicie estrictamente con 'SELECT'.
+        Returns:
+            JSON con los registros o string de error.
+        """
+        debug(f"🚀 [Tool PHP] Ejecutando consulta solicitada por el Agente:\n👉 {sql}\n")
+        
+        headers = {
+            "Authorization": f"Bearer {XIMHAI_KEY}",
+            "Content-Type": "application/json"
+        }
+        payload = {"query": sql}
+        
+        try:
+            # Añadimos un timeout estricto para que el agente no se quede colgado si PHP tarda
+            async with httpx.AsyncClient() as client:
 
+                #Este servicio solo puede ejecutar consultas que empiecen con SELECT, de lo contrario retorna una advertencia
+                response = await client.post(f"{self.url}/pruebaApi.php", json=payload, headers=headers, timeout=30.0)
+            
+            # Si PHP responde con códigos HTTP de error (500, 400, etc.)
+            if response.status_code != 200:
+                return f"ERROR_SISTEMA: El servidor PHP respondió con código de estado HTTP {response.status_code}. Detalle: {response.text}"
+            
+            data_php = response.json()
+            
+            # Si tu script de PHP atrapó un error de SQL y mandó {"status": "error", "message": "..."}
+            if data_php.get("status") == "error":
+                return f"ERROR_SQL_PHP: {data_php.get('message')}"
+                
+            resultados = data_php.get("resultado", [])
+            # if len(resultados) > 100:
+            #     # Truncamos para no saturar la ventana de contexto de Gemini
+            #     resultados_truncados = resultados[:100]
+            #     return json.dumps({
+            #         "aviso": f"Se encontraron {len(resultados)} registros. Mostrando solo los primeros 100 por seguridad de memoria.",
+            #         "data": resultados_truncados
+            #     }, ensure_ascii=False)
+            
+            return json.dumps(resultados, ensure_ascii=False)
+            
+        except httpx.TimeoutException:
+            return "ERROR_TIMEOUT: La consulta tardó demasiado en ejecutarse en el servidor PHP. Intenta optimizar los filtros o el LIMIT."
+        except Exception as e:
+            return f"ERROR_CONEXION: No se pudo comunicar con el endpoint de PHP. Detalle: {str(e)}"
 
 # =================================================================
 # Clase para tools de base de datos, para poder instanciar desde main
@@ -125,64 +181,6 @@ class fileTools:
             
         return "\n\n".join(contexto_para_el_agente)
 
-
-# =================================================================
-# Hacer request a PHP
-# =================================================================}
-    @traceable(run_type="tool", name="Ejecutar_Herramienta_PHPSQL")
-    async def ejecutar_consulta_php(self, sql: str) -> str:
-        """
-        Ejecuta exclusivamente sentencias SQL de tipo SELECT para recuperar datos reales de las filas.
-        
-        PROHIBIDO: No intentes usar comandos de inspección de esquemas como DESCRIBE, SHOW TABLES, 
-        SHOW COLUMNS, EXPLAIN o similares. Si no conoces el nombre de una tabla o columna, es obligatorio 
-        que uses primero la herramienta 'buscar_conocimiento_base_datos' para conocer el esquema.
-        
-        Args:
-            sql: Sentencia SQL que inicie estrictamente con 'SELECT'.
-        Returns:
-            JSON con los registros o string de error.
-        """
-        debug(f"🚀 [Tool PHP] Ejecutando consulta solicitada por el Agente:\n👉 {sql}\n")
-        
-        headers = {
-            "Authorization": f"Bearer {XIMHAI_KEY}",
-            "Content-Type": "application/json"
-        }
-        payload = {"query": sql}
-        
-        try:
-            # Añadimos un timeout estricto para que el agente no se quede colgado si PHP tarda
-            async with httpx.AsyncClient() as client:
-
-                #Este servicio solo puede ejecutar consultas que empiecen con SELECT, de lo contrario retorna una advertencia
-                response = await client.post(f"{self.url}/pruebaApi.php", json=payload, headers=headers, timeout=30.0)
-            
-            # Si PHP responde con códigos HTTP de error (500, 400, etc.)
-            if response.status_code != 200:
-                return f"ERROR_SISTEMA: El servidor PHP respondió con código de estado HTTP {response.status_code}. Detalle: {response.text}"
-            
-            data_php = response.json()
-            
-            # Si tu script de PHP atrapó un error de SQL y mandó {"status": "error", "message": "..."}
-            if data_php.get("status") == "error":
-                return f"ERROR_SQL_PHP: {data_php.get('message')}"
-                
-            resultados = data_php.get("resultado", [])
-            # if len(resultados) > 100:
-            #     # Truncamos para no saturar la ventana de contexto de Gemini
-            #     resultados_truncados = resultados[:100]
-            #     return json.dumps({
-            #         "aviso": f"Se encontraron {len(resultados)} registros. Mostrando solo los primeros 100 por seguridad de memoria.",
-            #         "data": resultados_truncados
-            #     }, ensure_ascii=False)
-            
-            return json.dumps(resultados, ensure_ascii=False)
-            
-        except httpx.TimeoutException:
-            return "ERROR_TIMEOUT: La consulta tardó demasiado en ejecutarse en el servidor PHP. Intenta optimizar los filtros o el LIMIT."
-        except Exception as e:
-            return f"ERROR_CONEXION: No se pudo comunicar con el endpoint de PHP. Detalle: {str(e)}"
 
 # =================================================================
 # Clase para tools de codigo, para poder instanciar desde main

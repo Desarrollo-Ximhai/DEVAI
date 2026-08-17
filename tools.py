@@ -375,7 +375,7 @@ class systemTools:
             "argumentos": argumentos,
             "datosExtra": self.datosExtra
         }
-        
+        debug(payload)
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(f"{self.url}/funciones-devAI.php", json=payload, headers=headers, timeout=15.0)

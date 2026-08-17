@@ -373,7 +373,7 @@ class systemTools:
             "accion": "ejecutar",
             "funcion": nombre_funcion,
             "argumentos": argumentos,
-            "datosExtra": datosExtra
+            "datosExtra": self.datosExtra
         }
         
         try:

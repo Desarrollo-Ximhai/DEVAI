@@ -286,11 +286,12 @@ class shotsTools:
         return "\n\n---\n\n".join(ejemplos_para_el_agente)
 
 class systemTools:
-    def __init__(self, url:str):
+    def __init__(self, url:str, datosExtra: dict | bool = False):
         """
         Recibe el dominio del servidor de php del sistema
         """
         self.url = url
+        self.datosExtra = datosExtra
 
     @traceable(run_type="tool", name="Buscar_Herramientas_Personalizadas_PHP")
     @traceable(run_type="chain", name="Buscar_Herramientas_Personalizadas_PHP")
@@ -371,7 +372,8 @@ class systemTools:
         payload = {
             "accion": "ejecutar",
             "funcion": nombre_funcion,
-            "argumentos": argumentos
+            "argumentos": argumentos,
+            "datosExtra": datosExtra
         }
         
         try:

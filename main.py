@@ -18,7 +18,7 @@ import uvicorn
 from accionesQdrant import Qdrant, conectarQdrant
 from accionesGemini import conectarGemini, generate_response, generate_response_streaming, embed_with_gemini
 from accionesChutes import  generate_response_chutes_streaming
-from accionesLiteLLM import generate_response_litellm_streaming 
+from accionesLiteLLM import generate_response_litellm_streaming, generate_response_litellm_simple
 from funciones import debug, crawl_site_async
 from tools import sqlTools, codigoTools, systemTools, shotsTools, fileTools
 
@@ -742,6 +742,14 @@ async def endpoint_crawl(request: Request):
     form_data = await request.form()
     
     url = form_data.get("url", "https://ximhai.com")
+    modelo = form_data.get("modelo", "gemini-lite")
+    system_instruction = form_data.get("system_instruction", None)
+    if(system_instruction == None or system_instruction == ''):
+        return {
+                "status": "error",
+                "mensaje": "No se recibió un system_instruction válido"
+            }
+
     
     # Aquí puedes ajustar cuántas páginas quieres y de a cuántas concurrentes
     paginas_extraidas = await crawl_site_async(
@@ -749,9 +757,16 @@ async def endpoint_crawl(request: Request):
         max_paginas=50, 
         max_concurrencia=5 # Descargará 5 páginas a la vez
     ) 
-    
+    textos_limpios = []
+    for pagina in paginas_extraidas:
+        texto = await generate_response_litellm_simple( prompt = system_instruction , model_name= modelo, proxy_key=LITELLM_PROXY_KEY, proxy_url=LITELLM_PROXY_URL )
+        if(texto.type == 'error'):
+            pass
+        textos_limpios.append(texto) 
+
     return {
         "status": "success",
         "total_paginas": len(paginas_extraidas),
-        "data": paginas_extraidas
+        "data": paginas_extraidas,
+        "dataLimpia" : textos_limpios
     }

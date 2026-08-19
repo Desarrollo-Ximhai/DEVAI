@@ -244,3 +244,45 @@ async def generate_response_litellm_streaming(prompt: str, model_name: str, prox
         "tokens_salida": tokens_salida_total,
         "chain_of_thought": chainOfThought_history
     }
+
+@traceable(run_type="llm", name="Lite_LLM_Simple_Response")
+async def generate_response_litellm_simple(prompt: str, model_name: str, proxy_key: str, proxy_url: str):
+    """
+    Genera una respuesta rápida y directa a través del proxy de LiteLLM.
+    Sin tools, sin historial, sin streaming. Ideal para pruebas rápidas.
+    """
+    debug(f"🤖 [LITELLM SIMPLE] Ejecutando modelo rápido: {model_name}")
+
+    # Formato mínimo requerido por la API
+    messages = [{"role": "user", "content": prompt}]
+
+    try:
+        response = await acompletion(
+            model=model_name,
+            messages=messages,
+            api_key=proxy_key,
+            api_base=proxy_url,
+            custom_llm_provider="openai", # Formato estándar para el proxy
+            stream=False # Desactivamos el streaming para obtener la respuesta completa de golpe
+        )
+        
+        # Extraemos el texto directamente de la respuesta
+        texto_respuesta = response.choices[0].message.content
+        
+        #return {"texto": texto_respuesta}
+        return {
+            "type": "texto",
+            "content": texto_respuesta}
+
+    except (RateLimitError, APIError) as e:
+        debug(f"❌ [LITELLM ERROR]: {str(e)}")
+        return {
+            "type": "error",
+            "content": f"Error al conectar al proxy: {str(e)}"}
+        
+        return {"error": f"Error en la API: {str(e)}"}
+    except Exception as e:
+        debug(f"❌ [ERROR GENERAL]: {str(e)}")
+        return {
+            "type": "error",
+            "content": f"Excepción durante la conexión al proxy: {str(e)}"}

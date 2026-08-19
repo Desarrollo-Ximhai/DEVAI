@@ -19,7 +19,7 @@ from accionesQdrant import Qdrant, conectarQdrant
 from accionesGemini import conectarGemini, generate_response, generate_response_streaming, embed_with_gemini
 from accionesChutes import  generate_response_chutes_streaming
 from accionesLiteLLM import generate_response_litellm_streaming 
-from funciones import debug
+from funciones import debug, crawl_site_async
 from tools import sqlTools, codigoTools, systemTools, shotsTools, fileTools
 
 ADMIN_KEY = os.environ.get("ADMIN_API_KEY")

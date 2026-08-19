@@ -38,8 +38,8 @@ async def procesar_pagina_async(url, client, base_url, dominio_base):
         # 1. Trafilatura necesita el HTML en texto para extraer
         texto_limpio = trafilatura.extract(html, output_format='markdown')
         resultado = None
-        if texto_limpio and len(texto_limpio) > 50:
-            resultado = {"url": url, "texto": texto_limpio}
+        #if texto_limpio and len(texto_limpio) > 50:
+        resultado = {"url": url, "texto": texto_limpio}
 
         # 2. Extraer nuevos enlaces con BeautifulSoup
         nuevos_enlaces = set()

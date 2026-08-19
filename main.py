@@ -730,3 +730,28 @@ async def devai_endpoint(request: Request):
     
     respuesta =  await objQdrant.embebirArchivos(descripcion, archivos_procesados, proyecto)
     return {"response": respuesta}
+
+
+
+#
+# =================================================================
+# NUEVO APARTADO: Para hacer crawl
+# =================================================================
+@app.post("/crawl", dependencies=[Depends(verificar_clave)])
+async def endpoint_crawl(request: Request):
+    form_data = await request.form()
+    
+    url = form_data.get("url", "https://ximhai.com")
+    
+    # Aquí puedes ajustar cuántas páginas quieres y de a cuántas concurrentes
+    paginas_extraidas = await crawl_site_async(
+        base_url=url, 
+        max_paginas=50, 
+        max_concurrencia=5 # Descargará 5 páginas a la vez
+    ) 
+    
+    return {
+        "status": "success",
+        "total_paginas": len(paginas_extraidas),
+        "data": paginas_extraidas
+    }

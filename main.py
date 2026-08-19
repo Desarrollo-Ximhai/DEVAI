@@ -761,9 +761,9 @@ async def endpoint_crawl(request: Request):
     for pagina in paginas_extraidas:
         prompt = f"{system_instruction}. \n\n TEXTO:{pagina}"
         texto = await generate_response_litellm_simple( prompt = prompt , model_name= modelo, proxy_key=LITELLM_PROXY_KEY, proxy_url=LITELLM_PROXY_URL )
-        if(texto.type == 'error'):
+        if(texto[type] == 'error'):
             pass
-        textos_limpios.append(texto) 
+        textos_limpios.append(texto['content']) 
 
     return {
         "status": "success",

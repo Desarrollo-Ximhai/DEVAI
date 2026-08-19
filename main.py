@@ -742,7 +742,7 @@ async def endpoint_crawl(request: Request):
     form_data = await request.form()
     
     url = form_data.get("url", "https://ximhai.com")
-    modelo = form_data.get("modelo", "gemini-lite")
+    modelo = form_data.get("modelo", "gemini-flash-36")
     system_instruction = form_data.get("system_instruction", None)
     if(system_instruction == None or system_instruction == ''):
         return {
@@ -758,12 +758,12 @@ async def endpoint_crawl(request: Request):
         max_concurrencia=5 # Descargará 5 páginas a la vez
     ) 
     textos_limpios = []
-    for pagina in paginas_extraidas:
-        prompt = f"{system_instruction}. \n\n TEXTO:{pagina}"
-        texto = await generate_response_litellm_simple( prompt = prompt , model_name= modelo, proxy_key=LITELLM_PROXY_KEY, proxy_url=LITELLM_PROXY_URL )
-        if(texto['type'] == 'error'):
-            pass
-        textos_limpios.append(texto['content']) 
+    # for pagina in paginas_extraidas:
+    # prompt = f"{system_instruction}. \n\n TEXTO:{pagina}"
+    # texto = await generate_response_litellm_simple( prompt = prompt , model_name= modelo, proxy_key=LITELLM_PROXY_KEY, proxy_url=LITELLM_PROXY_URL )
+    # if(texto['type'] == 'error'):
+    #     pass
+    # textos_limpios.append(texto['content']) 
 
     return {
         "status": "success",

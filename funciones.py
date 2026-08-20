@@ -4,6 +4,7 @@ from urllib.parse import urljoin, urlparse
 import xml.etree.ElementTree as ET
 
 from bs4 import BeautifulSoup
+import markdownify
 import trafilatura
 
 def debug(debug):
@@ -26,6 +27,22 @@ async def extraer_urls_sitemap_async(base_url, client):
         debug(f"Sitemap no disponible o error: {e}")
     return urls
 
+async def extraer_a_markdown(html):
+    soup = BeautifulSoup(html, 'html.parser')
+    
+    # Limpiamos el ruido técnico primero
+    for etiqueta in soup(["script", "style", "noscript"]):
+        etiqueta.extract()
+        
+    # Convertimos el DOM resultante a Markdown puro
+    # ATX style asegura que los headings usen # en vez de subrayados
+    texto_markdown = markdownify.markdownify(str(soup), heading_style="ATX")
+    
+    # Limpiamos saltos de línea excesivos
+    texto_limpio = "\n".join([linea for linea in texto_markdown.splitlines() if linea.strip()])
+    
+    return texto_limpio
+
 async def procesar_pagina_async(url, client, base_url, dominio_base):
     """Descarga una página, extrae su texto limpio y descubre nuevos enlaces."""
     try:
@@ -36,7 +53,8 @@ async def procesar_pagina_async(url, client, base_url, dominio_base):
         html = response.text
         
         # 1. Trafilatura necesita el HTML en texto para extraer
-        texto_limpio = trafilatura.extract(html, include_formatting=True, output_format='markdown')
+        #texto_limpio = trafilatura.extract(html, include_formatting=True, output_format='markdown')
+        texto_limpio = extraer_a_markdown(html)
         resultado = None
         #if texto_limpio and len(texto_limpio) > 50:
         resultado = {"url": url, "texto": texto_limpio}

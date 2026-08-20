@@ -764,10 +764,10 @@ async def endpoint_crawl(request: Request):
     # if(texto['type'] == 'error'):
     #     pass
     # textos_limpios.append(texto['content']) 
-
-    return {
-        "status": "success",
-        "total_paginas": len(paginas_extraidas),
-        "data": paginas_extraidas,
-        "dataLimpia" : textos_limpios
-    }
+    debug(paginas_extraidas)
+    # return {
+    #     "status": "success",
+    #     "total_paginas": len(paginas_extraidas),
+    #     "data": paginas_extraidas,
+    #     "dataLimpia" : textos_limpios
+    # }

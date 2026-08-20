@@ -36,7 +36,7 @@ async def procesar_pagina_async(url, client, base_url, dominio_base):
         html = response.text
         
         # 1. Trafilatura necesita el HTML en texto para extraer
-        texto_limpio = trafilatura.extract(html, output_format='xml')
+        texto_limpio = trafilatura.extract(html, include_formatting=True, output_format='markdown')
         resultado = None
         #if texto_limpio and len(texto_limpio) > 50:
         resultado = {"url": url, "texto": texto_limpio}

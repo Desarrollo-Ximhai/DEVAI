@@ -759,12 +759,12 @@ async def endpoint_crawl(request: Request):
     ) 
     textos_limpios = []
     # for pagina in paginas_extraidas:
-    prompt = f"{system_instruction}. \n\n TEXTO:{paginas_extraidas}"
-    texto = await generate_response_litellm_simple( prompt = prompt , model_name= modelo, proxy_key=LITELLM_PROXY_KEY, proxy_url=LITELLM_PROXY_URL )
+    prompt = f"Texto a limpiar:{paginas_extraidas}"
+    texto = await generate_response_litellm_simple( prompt = prompt , system_instruction= system_instruction, model_name= modelo, proxy_key=LITELLM_PROXY_KEY, proxy_url=LITELLM_PROXY_URL )
     if(texto['type'] == 'error'):
         pass
     textos_limpios.append(texto['content']) 
-    #debug(paginas_extraidas)
+    debug(paginas_extraidas)
     return {
         "status": "success",
         "total_paginas": len(paginas_extraidas),

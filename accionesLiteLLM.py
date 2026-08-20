@@ -246,15 +246,15 @@ async def generate_response_litellm_streaming(prompt: str, model_name: str, prox
     }
 
 @traceable(run_type="llm", name="Lite_LLM_Simple_Response")
-async def generate_response_litellm_simple(prompt: str, model_name: str, proxy_key: str, proxy_url: str):
+async def generate_response_litellm_simple(prompt: str, system_instruction:str, model_name: str, proxy_key: str, proxy_url: str):
     """
     Genera una respuesta rápida y directa a través del proxy de LiteLLM.
     Sin tools, sin historial, sin streaming. Ideal para pruebas rápidas.
     """
     debug(f"🤖 [LITELLM SIMPLE] Ejecutando modelo rápido: {model_name}")
-
-    # Formato mínimo requerido por la API
-    messages = [{"role": "user", "content": prompt}]
+    messages = []
+    messages.append({"role": "system", "content": system_instruction})
+    messages.append({"role": "user", "content": prompt})
 
     try:
         response = await acompletion(
@@ -279,8 +279,7 @@ async def generate_response_litellm_simple(prompt: str, model_name: str, proxy_k
         return {
             "type": "error",
             "content": f"Error al conectar al proxy: {str(e)}"}
-        
-        return {"error": f"Error en la API: {str(e)}"}
+            
     except Exception as e:
         debug(f"❌ [ERROR GENERAL]: {str(e)}")
         return {

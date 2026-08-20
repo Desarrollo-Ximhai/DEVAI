@@ -765,9 +765,9 @@ async def endpoint_crawl(request: Request):
     #     pass
     # textos_limpios.append(texto['content']) 
     debug(paginas_extraidas)
-    # return {
-    #     "status": "success",
-    #     "total_paginas": len(paginas_extraidas),
-    #     "data": paginas_extraidas,
-    #     "dataLimpia" : textos_limpios
-    # }
+    return {
+        "status": "success",
+        "total_paginas": len(paginas_extraidas),
+        "data": paginas_extraidas,
+        "dataLimpia" : textos_limpios
+    }

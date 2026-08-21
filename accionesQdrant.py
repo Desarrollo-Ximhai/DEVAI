@@ -474,10 +474,26 @@ class Qdrant:
                 "metadata": chunk['metadata'],
                 "embedding": embedding
             }
+        chunks_with_embeddings = []
+        lote_size = 80 # Nos mantenemos seguros por debajo del límite de 100
+        
+        for i in range(0, len(chunks_totales), lote_size):
+            lote = chunks_totales[i:i + lote_size]
+            
+            # Disparamos las peticiones del lote actual
+            tareas = [fetch_embedding_for_chunk(chunk) for chunk in lote]
+            resultados_lote = await asyncio.gather(*tareas)
+            chunks_with_embeddings.extend(resultados_lote)
+            
+            # Si aún quedan más chunks por procesar, esperamos 60 segundos
+            if i + lote_size < len(chunks_totales):
+                debug(f"Lote procesado. Esperando 60 segundos para evitar el Rate Limit (429)...")
+                await asyncio.sleep(60)
+        
         
         # Disparamos todas las peticiones a Gemini al mismo tiempo
-        tareas = [fetch_embedding_for_chunk(chunk) for chunk in chunks_totales]
-        chunks_with_embeddings = await asyncio.gather(*tareas)
+        # tareas = [fetch_embedding_for_chunk(chunk) for chunk in chunks_totales]
+        # chunks_with_embeddings = await asyncio.gather(*tareas)
         # -------------------------------------------------------------------
 
         collection_name = "DevAI-Analisis"

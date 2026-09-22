@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime
+import asyncio
 import json
 import os
 import time
@@ -16,9 +17,9 @@ import tiktoken
 import uvicorn
 
 from accionesQdrant import Qdrant, conectarQdrant
-from accionesGemini import conectarGemini, generate_response, generate_response_streaming, embed_with_gemini
+from accionesGemini import conectarGemini, generate_response_streaming, embed_with_gemini
 from accionesChutes import  generate_response_chutes_streaming
-from accionesLiteLLM import generate_response_litellm_streaming 
+from accionesLiteLLM import generate_response_litellm, generate_response_litellm_streaming 
 from funciones import debug
 from tools import sqlTools, codigoTools, systemTools, shotsTools, fileTools
 
@@ -31,7 +32,6 @@ LITELLM_PROXY_KEY = os.environ["LITELLM_PROXY_KEY"]
 LITELLM_PROXY_URL = os.environ["LITELLM_PROXY_URL"]
 QDRANT_URL = os.environ["QDRANT_URL"]
 QDRANT_API_KEY = os.environ.get("QDRANT_API_KEY") 
-KEY_FREE2 = os.environ.get("GOOGLE_API_KEY2") 
 GOOGLE_API_KEY= os.environ.get('KEY-FREE') 
 CHUTES_API_KEY= os.environ.get('CHUTES_API_KEY') 
 
@@ -527,6 +527,8 @@ async def devai_endpoint(request: Request):
         tokens_entrada_acumulados = 0
         tokens_salida_acumulados = 0
         textoRespuesta = ""
+        eventos = asyncio.Queue()
+        fin_streaming = object()
         extraInfo = {
             "name": f"agenteLiteLLM{proyecto}" ,
             "metadata": {
@@ -542,24 +544,48 @@ async def devai_endpoint(request: Request):
         else:
             streamingTexto = agenteChutes(historialModificado, objTools , objShots , objCodigo, objSystem, query, model_name, archivos_procesados, system_instruction, langsmith_extra={"name": f"agenteChutes{proyecto}"})
 
-        async for chunk in streamingTexto:
-            #debug('chunk en agente gemini:')
-            #debug(chunk)
-            if chunk.get("type") == "error":
-                yield f"{json.dumps({ 'type': 'error', 'content': chunk['content']}, ensure_ascii=False)}\n\n"
-            #CoT
-            if chunk.get("type") == "thought":
-                #debug(f"El LLM penso :" + chunk['content'])
-                yield f"{json.dumps({'type': 'thought', 'content': chunk['content']}, ensure_ascii=False)}\n\n"
+        async def producir_chunks():
+            try:
+                async for chunk in streamingTexto:
+                    await eventos.put(chunk)
+            except Exception as error:
+                await eventos.put({"type": "streaming_error", "error": error})
+            finally:
+                await eventos.put(fin_streaming)
 
-            elif chunk.get("type") == "token":
-                textoRespuesta += chunk["content"]  # Buffer para guardar posteriormente en Qdrant
-                yield f"{json.dumps({'type': 'token', 'content': chunk['content']}, ensure_ascii=False)}\n\n"
+        async def producir_ping():
+            while True:
+                await asyncio.sleep(20)
+                await eventos.put({"type": "ping"})
 
-            elif chunk.get("type") == "metrics":
-                tokens_entrada_acumulados = chunk["tokens_entrada"]
-                tokens_salida_acumulados = chunk["tokens_salida"]
-                cot = chunk['chain_of_thought']
+        tarea_llm = asyncio.create_task(producir_chunks())
+        tarea_ping = asyncio.create_task(producir_ping())
+        try:
+            while True:
+                chunk = await eventos.get()
+                if chunk is fin_streaming:
+                    break
+                if chunk.get("type") == "streaming_error":
+                    raise chunk["error"]
+
+                if chunk.get("type") == "error":
+                    yield f"{json.dumps({ 'type': 'error', 'content': chunk['content']}, ensure_ascii=False)}\n\n"
+                elif chunk.get("type") == "ping":
+                    yield f"{json.dumps({'type': 'ping'}, ensure_ascii=False)}\n\n"
+                elif chunk.get("type") == "thought":
+                    yield f"{json.dumps({'type': 'thought', 'content': chunk['content']}, ensure_ascii=False)}\n\n"
+                elif chunk.get("type") == "token":
+                    textoRespuesta += chunk["content"]
+                    yield f"{json.dumps({'type': 'token', 'content': chunk['content']}, ensure_ascii=False)}\n\n"
+                elif chunk.get("type") == "metrics":
+                    tokens_entrada_acumulados = chunk["tokens_entrada"]
+                    tokens_salida_acumulados = chunk["tokens_salida"]
+                    cot = chunk['chain_of_thought']
+        finally:
+            tarea_ping.cancel()
+            if not tarea_llm.done():
+                tarea_llm.cancel()
+            await asyncio.gather(tarea_ping, tarea_llm, return_exceptions=True)
 
         debug(f"Streaming finalizado. Guardando memoria... Chars: {len(textoRespuesta)}")
         debug(f" TOKENS en Agentic , TokIn+: {tokens_entrada_acumulados}, TokOut+: {tokens_salida_acumulados}")
@@ -594,7 +620,14 @@ async def devai_endpoint(request: Request):
         }
         yield f"{json.dumps(respuesta_final_metadata, ensure_ascii=False)}\n\n"
 
-    return StreamingResponse(generar_eventos_stream(), media_type="text/event-stream")
+    return StreamingResponse(
+        generar_eventos_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 #
@@ -608,7 +641,6 @@ class FreePromptRequest(BaseModel):
 
 @app.post("/prompt", dependencies=[Depends(verificar_clave)])
 async def free_prompt_endpoint(request: FreePromptRequest):
-    conectarGemini(KEY_FREE2)
     try:
         if not request.prompt:
             respuesta = {'error': "No se recibió un prompt válido"  }
@@ -618,7 +650,10 @@ async def free_prompt_endpoint(request: FreePromptRequest):
             return {"response": respuesta}
 
 
-        response = await generate_response(request.prompt, request.model_name)
+        response = await generate_response_litellm(
+            request.prompt,
+            request.model_name,
+        )
 
         response = response["texto"].strip()
         

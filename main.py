@@ -16,9 +16,9 @@ import tiktoken
 import uvicorn
 
 from accionesQdrant import Qdrant, conectarQdrant
-from accionesGemini import conectarGemini, generate_response, generate_response_streaming, embed_with_gemini
+from accionesGemini import conectarGemini, generate_response_streaming, embed_with_gemini
 from accionesChutes import  generate_response_chutes_streaming
-from accionesLiteLLM import generate_response_litellm_streaming 
+from accionesLiteLLM import generate_response_litellm, generate_response_litellm_streaming 
 from funciones import debug
 from tools import sqlTools, codigoTools, systemTools, shotsTools, fileTools
 
@@ -31,7 +31,6 @@ LITELLM_PROXY_KEY = os.environ["LITELLM_PROXY_KEY"]
 LITELLM_PROXY_URL = os.environ["LITELLM_PROXY_URL"]
 QDRANT_URL = os.environ["QDRANT_URL"]
 QDRANT_API_KEY = os.environ.get("QDRANT_API_KEY") 
-KEY_FREE2 = os.environ.get("GOOGLE_API_KEY2") 
 GOOGLE_API_KEY= os.environ.get('KEY-FREE') 
 CHUTES_API_KEY= os.environ.get('CHUTES_API_KEY') 
 
@@ -608,17 +607,18 @@ class FreePromptRequest(BaseModel):
 
 @app.post("/prompt", dependencies=[Depends(verificar_clave)])
 async def free_prompt_endpoint(request: FreePromptRequest):
-    conectarGemini(KEY_FREE2)
     try:
         if not request.prompt:
             respuesta = {'error': "No se recibió un prompt válido"  }
             return {"response": respuesta}
         if not request.model_name:
-            respuesta = {'error': "No se recibió un modelo válido"  }
-            return {"response": respuesta}
+            request.model_name = "mercury-ximhai-chat"
 
 
-        response = await generate_response(request.prompt, request.model_name)
+        response = await generate_response_litellm(
+            request.prompt,
+            request.model_name,
+        )
 
         response = response["texto"].strip()
         

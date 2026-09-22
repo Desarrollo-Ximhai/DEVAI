@@ -646,8 +646,7 @@ async def free_prompt_endpoint(request: FreePromptRequest):
             respuesta = {'error': "No se recibió un prompt válido"  }
             return {"response": respuesta}
         if not request.model_name:
-            respuesta = {'error': "No se recibió un modelo válido"  }
-            return {"response": respuesta}
+            request.model_name = "mercury-ximhai-chat"
 
 
         response = await generate_response_litellm(

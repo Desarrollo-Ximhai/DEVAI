@@ -8,6 +8,58 @@ from langsmith import traceable
 
 from funciones import debug
 
+@traceable(run_type="chain", name="Lite_LLM_Response")
+async def generate_response_litellm(prompt: str, model_name: str, json_response: bool = False):
+    debug(f"🤖 [LITELLM] Ejecutando modelo: {model_name}")
+
+    extra_kwargs = {
+        "temperature": 0,
+    }
+    if json_response:
+        extra_kwargs["response_format"] = {"type": "json_object"}
+
+    try:
+        response = await acompletion(
+            model=model_name,
+            messages=[{"role": "user", "content": prompt}],
+            api_key=os.environ["LITELLM_PROXY_KEY"],
+            api_base=os.environ["LITELLM_PROXY_URL"],
+            custom_llm_provider="openai",
+            **extra_kwargs,
+        )
+    except (RateLimitError, APIError) as e:
+        debug(f"❌ [LITELLM ERROR]: {str(e)}")
+        return {
+            "texto": f"Error en LiteLLM: {str(e)}",
+            "tokens_entrada": 0,
+            "tokens_salida": 0,
+            "status": "error",
+        }
+    except Exception as e:
+        debug(f"❌ [ERROR GENERAL]: {str(e)}")
+        return {
+            "texto": f"Error conectando con LiteLLM: {str(e)}",
+            "tokens_entrada": 0,
+            "tokens_salida": 0,
+            "status": "error",
+        }
+
+    message = response.choices[0].message
+    usage = getattr(response, "usage", None)
+    tokens_entrada = getattr(usage, "prompt_tokens", 0) if usage else 0
+    tokens_salida = getattr(usage, "completion_tokens", 0) if usage else 0
+
+    debug(f"--- Info de la petición LiteLLM ---")
+    debug(f"Tokens Entrada: {tokens_entrada} | Tokens Salida: {tokens_salida}")
+
+    return {
+        "texto": message.content or "",
+        "tokens_entrada": tokens_entrada,
+        "tokens_salida": tokens_salida,
+        "status": "success",
+    }
+
+
 @traceable(run_type="chain", name="Lite_LLM_Agent_Stream")
 async def generate_response_litellm_streaming(prompt: str, model_name: str, proxy_key: str, proxy_url:str, archivos: list = None, configuracion: dict = None, tools_schemas: list = None, tool_functions: dict = None, system_instruction: str = None, history: list = None):
     debug(f"🤖 [LITELLM] Ejecutando modelo: {model_name} " )

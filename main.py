@@ -675,6 +675,9 @@ async def devai_endpoint(request: Request):
     
     descripcion = form_data.get("descripcion", "")
     proyecto = form_data.get("proyecto", "")
+    model_name = form_data.get("model_name")
+    if not model_name:
+        raise HTTPException(status_code=400, detail="Se requiere model_name para LiteLLM")
     
     objQdrant = Qdrant(
         client=client,  
@@ -692,7 +695,12 @@ async def devai_endpoint(request: Request):
                 "filename": value.filename
             })
     archivo = archivos_procesados[0]
-    respuesta =  await objQdrant.embebirBaseDatos(descripcion, archivo, proyecto)
+    respuesta = await objQdrant.embebirBaseDatos(
+        descripcion,
+        archivo,
+        proyecto,
+        model_name,
+    )
     return {"response": respuesta}
 
 

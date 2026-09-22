@@ -21,7 +21,8 @@ from fastembed.sparse import SparseTextEmbedding
 from langsmith import traceable
 
 
-from accionesGemini import conectarGemini, generate_response, embed_with_gemini
+from accionesGemini import conectarGemini, embed_with_gemini
+from accionesLiteLLM import generate_response_litellm
 from funciones import debug
 
 sparse_model = SparseTextEmbedding(model_name="Qdrant/bm25")
@@ -309,11 +310,7 @@ class Qdrant:
 
         return puntos
 
-    async def embebirBaseDatos(self, descripcion, archivo, proyecto):
-        GOOGLE_API_KEY= os.environ.get('KEY-FREE') 
-        conectarGemini(GOOGLE_API_KEY)
-
-
+    async def embebirBaseDatos(self, descripcion, archivo, proyecto, model_name):
         archivos_procesados = []
         chunks_de_base_datos = [] 
         sql_string =  archivo["data"].decode("utf-8", errors="ignore")
@@ -337,7 +334,13 @@ class Qdrant:
         """
 
         
-        respuesta = await generate_response(prompt, "models/gemini-3.6-flash", json=True)
+        respuesta = await generate_response_litellm(
+            prompt,
+            model_name,
+            json_response=True,
+        )
+        if respuesta["status"] != "success":
+            raise RuntimeError(respuesta["texto"])
         diccionario_descripciones = json.loads(respuesta["texto"])
         #return respuesta
         for chunk in chunks_base:

@@ -650,8 +650,69 @@ async def free_prompt_endpoint(request: FreePromptRequest):
 
 
         response = await generate_response_litellm(
-            request.prompt,
-            request.model_name,
+            prompt=request.prompt,
+            model_name=request.model_name,
+        )
+
+        response = response["texto"].strip()
+        
+        return {"response": response}
+        
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+
+class BlogRequest(BaseModel):
+    prompt: str
+    model_name: str 
+
+@app.post("/blog", dependencies=[Depends(verificar_clave)])
+async def blog_endpoint(request: BlogRequest):
+    client = conectarQdrant(QDRANT_URL, QDRANT_API_KEY)
+    try:
+        if not request.prompt:
+            respuesta = {'error': "No se recibió un prompt válido"  }
+            return {"response": respuesta}
+        if not request.model_name:
+            request.model_name = "mercury-ximhai-chat"
+        if not request.proyecto:
+            request.proyecto = "default-proyecto"
+        if not request.archivo:
+            request.archivo = "DevAI-Analisis"
+
+        objQdrantFile = Qdrant(
+            client=client,  
+            collection=request.archivo,
+            proyecto=request.proyecto
+        )
+
+        tool_schemas = [{
+            "type": "function",
+            "function": {
+                "name": "buscar_conocimiento_archivos",
+                "description": "Busca información relevante en los manuales de marca, documentos PDF, políticas, servicios e información general del negocio del proyecto actual.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Términos, preguntas o conceptos a buscar (ej: 'uso de logo', 'horarios', 'garantía', 'servicios')."
+                        }
+                    },
+                    "required": ["query"]
+                }
+            }
+        }]
+        tool_funcions = {
+            "buscar_conocimiento_archivos": objQdrantFile.buscar_conocimiento_archivos
+        }
+        
+
+        response = await generate_response_litellm(
+            prompt=request.prompt,
+            model_name=request.model_name,
+            tools_schemas=tool_schemas,
+            tool_functions=tool_funcions
         )
 
         response = response["texto"].strip()

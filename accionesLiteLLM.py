@@ -9,7 +9,7 @@ from langsmith import traceable
 from funciones import debug
 
 @traceable(run_type="chain", name="Lite_LLM_Response")
-async def generate_response_litellm(prompt: str, model_name: str, json_response: bool = False):
+async def generate_response_litellm(prompt: str, model_name: str, json_response: bool = False, tools_schemas: list | None = None, tool_functions: dict | None = None):
     debug(f"🤖 [LITELLM] Ejecutando modelo: {model_name}")
 
     extra_kwargs = {
@@ -18,36 +18,105 @@ async def generate_response_litellm(prompt: str, model_name: str, json_response:
     if json_response:
         extra_kwargs["response_format"] = {"type": "json_object"}
 
-    try:
-        response = await acompletion(
-            model=model_name,
-            messages=[{"role": "user", "content": prompt}],
-            api_key=os.environ["LITELLM_PROXY_KEY"],
-            api_base=os.environ["LITELLM_PROXY_URL"],
-            custom_llm_provider="openai",
-            **extra_kwargs,
-        )
-    except (RateLimitError, APIError) as e:
-        debug(f"❌ [LITELLM ERROR]: {str(e)}")
-        return {
-            "texto": f"Error en LiteLLM: {str(e)}",
-            "tokens_entrada": 0,
-            "tokens_salida": 0,
-            "status": "error",
-        }
-    except Exception as e:
-        debug(f"❌ [ERROR GENERAL]: {str(e)}")
-        return {
-            "texto": f"Error conectando con LiteLLM: {str(e)}",
-            "tokens_entrada": 0,
-            "tokens_salida": 0,
-            "status": "error",
-        }
+    messages = [{"role": "user", "content": prompt}]
+    tokens_entrada = 0
+    tokens_salida = 0
+    texto = ""
+    modo_agente = bool(tools_schemas and tool_functions)
+    max_iterations = 25
 
-    message = response.choices[0].message
-    usage = getattr(response, "usage", None)
-    tokens_entrada = getattr(usage, "prompt_tokens", 0) if usage else 0
-    tokens_salida = getattr(usage, "completion_tokens", 0) if usage else 0
+    for iteration in range(1, max_iterations + 1):
+        kwargs_llamada = {
+            "model": model_name,
+            "messages": messages,
+            "api_key": os.environ["LITELLM_PROXY_KEY"],
+            "api_base": os.environ["LITELLM_PROXY_URL"],
+            "custom_llm_provider": "openai",
+            **extra_kwargs,
+        }
+        if modo_agente:
+            kwargs_llamada["tools"] = tools_schemas
+            kwargs_llamada["tool_choice"] = "auto"
+
+        try:
+            response = await acompletion(**kwargs_llamada)
+        except (RateLimitError, APIError) as e:
+            debug(f"❌ [LITELLM ERROR]: {str(e)}")
+            return {
+                "texto": f"Error en LiteLLM: {str(e)}",
+                "tokens_entrada": 0,
+                "tokens_salida": 0,
+                "status": "error",
+            }
+        except Exception as e:
+            debug(f"❌ [ERROR GENERAL]: {str(e)}")
+            return {
+                "texto": f"Error conectando con LiteLLM: {str(e)}",
+                "tokens_entrada": 0,
+                "tokens_salida": 0,
+                "status": "error",
+            }
+
+        message = response.choices[0].message
+        usage = getattr(response, "usage", None)
+        tokens_entrada += getattr(usage, "prompt_tokens", 0) if usage else 0
+        tokens_salida += getattr(usage, "completion_tokens", 0) if usage else 0
+        tool_calls = getattr(message, "tool_calls", None)
+        normalized_tool_calls = []
+        for tool_call in tool_calls or []:
+            if hasattr(tool_call, "model_dump"):
+                normalized_tool_calls.append(tool_call.model_dump())
+            elif isinstance(tool_call, dict):
+                normalized_tool_calls.append(tool_call)
+            else:
+                normalized_tool_calls.append({
+                    "id": getattr(tool_call, "id", None),
+                    "type": getattr(tool_call, "type", "function"),
+                    "function": {
+                        "name": getattr(getattr(tool_call, "function", None), "name", ""),
+                        "arguments": getattr(getattr(tool_call, "function", None), "arguments", "{}"),
+                    },
+                })
+
+        messages.append({
+            "role": "assistant",
+            "content": getattr(message, "content", None),
+            **({"tool_calls": normalized_tool_calls} if normalized_tool_calls else {}),
+        })
+
+        if not normalized_tool_calls:
+            texto = getattr(message, "content", None) or ""
+            break
+
+        for tool_call in normalized_tool_calls:
+            func_id = tool_call.get("id")
+            function = tool_call.get("function", {})
+            func_name = function.get("name", "")
+            try:
+                func_args = json.loads(function.get("arguments", "{}"))
+            except (TypeError, json.JSONDecodeError):
+                func_args = {}
+
+            if func_name in tool_functions:
+                function_to_call = tool_functions[func_name]
+                if asyncio.iscoroutinefunction(function_to_call):
+                    function_response = await function_to_call(**func_args)
+                else:
+                    function_response = function_to_call(**func_args)
+                content_str = function_response if isinstance(function_response, str) else json.dumps(function_response, ensure_ascii=False)
+            else:
+                content_str = '{"error": "Función no registrada."}'
+
+            messages.append({
+                "role": "tool",
+                "tool_call_id": func_id,
+                "name": func_name,
+                "content": content_str,
+            })
+        continue
+
+    if modo_agente and not texto:
+        debug(f"🛑 [AGENTE WARN] Límite de {max_iterations} iteraciones alcanzado.")
 
     debug(f"--- Info de la petición LiteLLM ---")
     debug(f"Tokens Entrada: {tokens_entrada} | Tokens Salida: {tokens_salida}")

@@ -19,8 +19,8 @@ import uvicorn
 from accionesQdrant import Qdrant, conectarQdrant
 from accionesGemini import conectarGemini, generate_response_streaming, embed_with_gemini
 from accionesChutes import  generate_response_chutes_streaming
-from accionesLiteLLM import generate_response_litellm, generate_response_litellm_streaming 
-from funciones import debug
+from accionesLiteLLM import generate_response_litellm_streaming, generate_response_litellm_simple 
+from funciones import debug, crawl_site_async
 from tools import sqlTools, codigoTools, systemTools, shotsTools, fileTools
 
 ADMIN_KEY = os.environ.get("ADMIN_API_KEY")
@@ -457,6 +457,8 @@ async def devai_endpoint(request: Request):
     historial = form_data.get("historial", "")
     max_tokens = int(form_data.get("max_tokens", 6000))
     guardarFewShot = form_data.get("fewShot", False)
+
+    datosExtra = form_data.get("datosExtra", False)
     
     #Por si vienen archivos
     archivos_procesados = []
@@ -512,7 +514,7 @@ async def devai_endpoint(request: Request):
     objShots = shotsTools(objQdrant=objShotsQ)
     objCodigo = codigoTools(objQdrant=objQdrantCodigo)
     objFile = fileTools(objQdrant=objQdrantFile)
-    objSystem = systemTools(url=url)
+    objSystem = systemTools(url=url, datosExtra = datosExtra)
 
     if(conCodigo == False):
         objCodigo = None
@@ -639,7 +641,7 @@ class FreePromptRequest(BaseModel):
     prompt: str
     model_name: str 
 
-@app.post("/prompt", dependencies=[Depends(verificar_clave)])
+@app.post("/prompt", dependencies=[Depends(verificar_clave)]) 
 async def free_prompt_endpoint(request: FreePromptRequest):
     try:
         if not request.prompt:
@@ -665,8 +667,10 @@ async def free_prompt_endpoint(request: FreePromptRequest):
 class BlogRequest(BaseModel):
     prompt: str
     model_name: str 
+    proyecto: str
+    archivo: str
 
-@app.post("/blog", dependencies=[Depends(verificar_clave)])
+@app.post("/blog", dependencies=[Depends(verificar_clave)]) 
 async def blog_endpoint(request: BlogRequest):
     client = conectarQdrant(QDRANT_URL, QDRANT_API_KEY)
     try:
@@ -831,3 +835,44 @@ async def devai_endpoint(request: Request):
     
     respuesta =  await objQdrant.embebirArchivos(descripcion, archivos_procesados, proyecto)
     return {"response": respuesta}
+
+
+
+#
+# =================================================================
+# NUEVO APARTADO: Para hacer crawl
+# =================================================================
+@app.post("/crawl", dependencies=[Depends(verificar_clave)])
+async def endpoint_crawl(request: Request):
+    form_data = await request.form()
+    
+    url = form_data.get("url", "https://ximhai.com")
+    modelo = form_data.get("modelo", "gemini-flash-36")
+    system_instruction = form_data.get("system_instruction", None)
+    if(system_instruction == None or system_instruction == ''):
+        return {
+                "status": "error",
+                "mensaje": "No se recibió un system_instruction válido"
+            }
+
+    
+    # Aquí puedes ajustar cuántas páginas quieres y de a cuántas concurrentes
+    paginas_extraidas = await crawl_site_async(
+        base_url=url, 
+        max_paginas=50, 
+        max_concurrencia=5 # Descargará 5 páginas a la vez
+    ) 
+    textos_limpios = []
+    # for pagina in paginas_extraidas:
+    prompt = f"Texto a limpiar:{paginas_extraidas}"
+    texto = await generate_response_litellm_simple( prompt = prompt , system_instruction= system_instruction, model_name= modelo, proxy_key=LITELLM_PROXY_KEY, proxy_url=LITELLM_PROXY_URL )
+    if(texto['type'] == 'error'):
+        pass
+    textos_limpios.append(texto['content']) 
+    debug(paginas_extraidas)
+    return {
+        "status": "success",
+        "total_paginas": len(paginas_extraidas),
+        "data": paginas_extraidas,
+        "dataLimpia" : textos_limpios
+    }

@@ -10,3 +10,6 @@ openai
 langsmith
 litellm==1.93.0
 pymupdf
+trafilatura
+beautifulsoup4
+markdownify

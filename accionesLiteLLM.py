@@ -38,6 +38,7 @@ async def generate_response_litellm(prompt: str, model_name: str, json_response:
             kwargs_llamada["tools"] = tools_schemas
             kwargs_llamada["tool_choice"] = "auto"
 
+        debug(kwargs_llamada)
         try:
             response = await acompletion(**kwargs_llamada)
         except (RateLimitError, APIError) as e:

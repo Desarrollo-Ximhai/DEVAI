@@ -667,6 +667,8 @@ async def free_prompt_endpoint(request: FreePromptRequest):
 class BlogRequest(BaseModel):
     prompt: str
     model_name: str 
+    proyecto: str
+    archivo: str
 
 @app.post("/blog", dependencies=[Depends(verificar_clave)])
 async def blog_endpoint(request: BlogRequest):

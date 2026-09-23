@@ -687,6 +687,7 @@ async def blog_endpoint(request: BlogRequest):
             collection=request.archivo,
             proyecto=request.proyecto
         )
+        objFile = fileTools(objQdrant=objQdrantFile)
 
         tool_schemas = [{
             "type": "function",
@@ -706,7 +707,7 @@ async def blog_endpoint(request: BlogRequest):
             }
         }]
         tool_funcions = {
-            "buscar_conocimiento_archivos": objQdrantFile.buscar_conocimiento_archivos
+            "buscar_conocimiento_archivos": objFile.buscar_conocimiento_archivos
         }
         
 

@@ -8,7 +8,7 @@ from langsmith import traceable
 
 from funciones import debug
 
-@traceable(run_type="chain", name="Lite_LLM_Response")
+@traceable(run_type="chain", name="Lite_LLM_Response") 
 async def generate_response_litellm(prompt: str, model_name: str, json_response: bool = False, tools_schemas: list | None = None, tool_functions: dict | None = None):
     debug(f"🤖 [LITELLM] Ejecutando modelo: {model_name}")
 

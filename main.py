@@ -19,7 +19,7 @@ import uvicorn
 from accionesQdrant import Qdrant, conectarQdrant
 from accionesGemini import conectarGemini, generate_response_streaming, embed_with_gemini
 from accionesChutes import  generate_response_chutes_streaming
-from accionesLiteLLM import generate_response_litellm_streaming, generate_response_litellm_simple
+from accionesLiteLLM import generate_response_litellm_streaming, generate_response_litellm_simple 
 from funciones import debug, crawl_site_async
 from tools import sqlTools, codigoTools, systemTools, shotsTools, fileTools
 
@@ -641,7 +641,7 @@ class FreePromptRequest(BaseModel):
     prompt: str
     model_name: str 
 
-@app.post("/prompt", dependencies=[Depends(verificar_clave)])
+@app.post("/prompt", dependencies=[Depends(verificar_clave)]) 
 async def free_prompt_endpoint(request: FreePromptRequest):
     try:
         if not request.prompt:
@@ -670,7 +670,7 @@ class BlogRequest(BaseModel):
     proyecto: str
     archivo: str
 
-@app.post("/blog", dependencies=[Depends(verificar_clave)])
+@app.post("/blog", dependencies=[Depends(verificar_clave)]) 
 async def blog_endpoint(request: BlogRequest):
     client = conectarQdrant(QDRANT_URL, QDRANT_API_KEY)
     try:

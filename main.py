@@ -417,6 +417,15 @@ async def health():
 @traceable
 @app.post("/devaiAgent", dependencies=[Depends(verificar_clave)])
 async def devai_endpoint(request: Request):
+    return await ejecutar_devai(request, streaming=True)
+
+
+@app.post("/devaiAgent/sin-stream", dependencies=[Depends(verificar_clave)])
+async def devai_sin_stream(request: Request):
+    return await ejecutar_devai(request, streaming=False)
+
+
+async def ejecutar_devai(request: Request, *, streaming: bool):
     client = conectarQdrant(QDRANT_URL, QDRANT_API_KEY)
 
     default_system_instruction = """
@@ -523,26 +532,24 @@ async def devai_endpoint(request: Request):
     query = f"<mainQuery>{query}</mainQuery"
     
   
-    async def generar_eventos_stream():
-        tokens_entrada_acumulados = 0
-        tokens_salida_acumulados = 0
-        textoRespuesta = ""
+    extraInfo = {
+        "name": f"agenteLiteLLM{proyecto}" ,
+        "metadata": {
+            "chat_id": chat_id,
+            "modelo": model_name
+
+        }
+    }
+    if(proveedor == 'gemini'):
+        streamingTexto = agenteGemini(historialModificado, objTools , objShots , objCodigo, objSystem, query, model_name, archivos_procesados, system_instruction, langsmith_extra={"name": f"agenteGemini{proyecto}"})
+    elif (proveedor == 'litellm'):
+        streamingTexto = agenteLitellm(historialModificado, objTools , objShots , objCodigo, objFile, objSystem, query, model_name, archivos_procesados, system_instruction, langsmith_extra= extraInfo)
+    else:
+        streamingTexto = agenteChutes(historialModificado, objTools , objShots , objCodigo, objSystem, query, model_name, archivos_procesados, system_instruction, langsmith_extra={"name": f"agenteChutes{proyecto}"})
+
+    async def chunks_con_ping():
         eventos = asyncio.Queue()
         fin_streaming = object()
-        extraInfo = {
-            "name": f"agenteLiteLLM{proyecto}" ,
-            "metadata": {
-                "chat_id": chat_id,
-                "modelo": model_name
-
-            }
-        }
-        if(proveedor == 'gemini'):
-            streamingTexto = agenteGemini(historialModificado, objTools , objShots , objCodigo, objSystem, query, model_name, archivos_procesados, system_instruction, langsmith_extra={"name": f"agenteGemini{proyecto}"})
-        elif (proveedor == 'litellm'):
-            streamingTexto = agenteLitellm(historialModificado, objTools , objShots , objCodigo, objFile, objSystem, query, model_name, archivos_procesados, system_instruction, langsmith_extra= extraInfo)
-        else:
-            streamingTexto = agenteChutes(historialModificado, objTools , objShots , objCodigo, objSystem, query, model_name, archivos_procesados, system_instruction, langsmith_extra={"name": f"agenteChutes{proyecto}"})
 
         async def producir_chunks():
             try:
@@ -568,25 +575,36 @@ async def devai_endpoint(request: Request):
                 if chunk.get("type") == "streaming_error":
                     raise chunk["error"]
 
-                if chunk.get("type") == "error":
-                    yield f"{json.dumps({ 'type': 'error', 'content': chunk['content']}, ensure_ascii=False)}\n\n"
-                elif chunk.get("type") == "ping":
-                    yield f"{json.dumps({'type': 'ping'}, ensure_ascii=False)}\n\n"
-                elif chunk.get("type") == "thought":
-                    yield f"{json.dumps({'type': 'thought', 'content': chunk['content']}, ensure_ascii=False)}\n\n"
-                elif chunk.get("type") == "token":
-                    textoRespuesta += chunk["content"]
-                    yield f"{json.dumps({'type': 'token', 'content': chunk['content']}, ensure_ascii=False)}\n\n"
-                elif chunk.get("type") == "metrics":
-                    tokens_entrada_acumulados = chunk["tokens_entrada"]
-                    tokens_salida_acumulados = chunk["tokens_salida"]
-                    cot = chunk['chain_of_thought']
+                yield chunk
         finally:
             tarea_ping.cancel()
             if not tarea_llm.done():
                 tarea_llm.cancel()
             await asyncio.gather(tarea_ping, tarea_llm, return_exceptions=True)
 
+    async def generar_eventos():
+        tokens_entrada_acumulados = 0
+        tokens_salida_acumulados = 0
+        cot = ""
+        partes = []
+        chunks = chunks_con_ping() if streaming else streamingTexto
+        async for chunk in chunks:
+            tipo = chunk.get("type")
+            if tipo == "error" and not streaming:
+                raise HTTPException(status_code=502, detail=chunk["content"])
+            if tipo == "metrics":
+                tokens_entrada_acumulados = chunk["tokens_entrada"]
+                tokens_salida_acumulados = chunk["tokens_salida"]
+                cot = chunk.get("chain_of_thought", "")
+            elif tipo in ("error", "thought", "token"):
+                if tipo == "token":
+                    partes.append(chunk["content"])
+                if streaming:
+                    yield {"type": tipo, "content": chunk["content"]}
+            elif tipo == "ping" and streaming:
+                yield {"type": "ping"}
+
+        textoRespuesta = "".join(partes)
         debug(f"Streaming finalizado. Guardando memoria... Chars: {len(textoRespuesta)}")
         debug(f" TOKENS en Agentic , TokIn+: {tokens_entrada_acumulados}, TokOut+: {tokens_salida_acumulados}")
         # Guardado en la memoria de Qdrant  
@@ -618,7 +636,23 @@ async def devai_endpoint(request: Request):
             "tokens_entrada": tokens_entrada_acumulados, 
             "tokens_salida": tokens_salida_acumulados,
         }
-        yield f"{json.dumps(respuesta_final_metadata, ensure_ascii=False)}\n\n"
+        if streaming:
+            yield respuesta_final_metadata
+        else:
+            yield {
+                "respuesta": textoRespuesta,
+                "uuids": uuids,
+                "tokens_entrada": tokens_entrada_acumulados,
+                "tokens_salida": tokens_salida_acumulados,
+            }
+
+    if not streaming:
+        async for resultado in generar_eventos():
+            return resultado
+
+    async def generar_eventos_stream():
+        async for evento in generar_eventos():
+            yield f"{json.dumps(evento, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(
         generar_eventos_stream(),

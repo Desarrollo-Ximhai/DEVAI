@@ -466,6 +466,7 @@ async def ejecutar_devai(request: Request, *, streaming: bool):
     historial = form_data.get("historial", "")
     max_tokens = int(form_data.get("max_tokens", 6000))
     guardarFewShot = form_data.get("fewShot", False)
+    datosExtra = form_data.get("datosExtra", False)
     
     #Por si vienen archivos
     archivos_procesados = []
@@ -521,7 +522,7 @@ async def ejecutar_devai(request: Request, *, streaming: bool):
     objShots = shotsTools(objQdrant=objShotsQ)
     objCodigo = codigoTools(objQdrant=objQdrantCodigo)
     objFile = fileTools(objQdrant=objQdrantFile)
-    objSystem = systemTools(url=url)
+    objSystem = systemTools(url=url, datosExtra = datosExtra)
 
     if(conCodigo == False):
         objCodigo = None
